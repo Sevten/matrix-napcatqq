@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"/pkg/onebot"
+	"github.com/sevten/matrix-napcatqq/pkg/onebot"
 	"maunium.net/go/mautrix/bridgev2"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/format"

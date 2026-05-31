@@ -19,10 +19,10 @@ jobs:
       # Fork from https://github.com/koishijs/boilerplate/blob/master/.github/workflows/docker.yml
       - name: Run buildx and push
         env:
-          DOCKER_REPO: lxduo/matrix-napcatqq
-          GITHUB_REPO: duo/matrix-napcatqq
+          DOCKER_REPO: sevten/matrix-napcatqq
+          GITHUB_REPO: sevten/matrix-napcatqq
         run: |
-          TAG=$(curl "https://api.github.com/repos/duo/matrix-napcatqq/git/refs/tags" | jq -r '.[-1].ref' | sed 's|refs/tags/||')
+          TAG=$(curl "https://api.github.com/repos/sevten/matrix-napcatqq/git/refs/tags" | jq -r '.[-1].ref' | sed 's|refs/tags/||')
           docker buildx build \
             --output "type=image,push=true" \
             --platform linux/amd64,linux/arm64 \

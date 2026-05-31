@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	LoginStepNapCatQQ = "me.lxduo.qq.login.napcat"
-	LoginStepComplete = "me.lxduo.qq.login.complete"
+	LoginStepNapCatQQ = "com.github.sevten.qq.login.napcat"
+	LoginStepComplete = "com.github.sevten.qq.login.complete"
 )
 
 type NapCatLogin struct {

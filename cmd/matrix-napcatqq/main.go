@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/duo/matrix-napcatqq/pkg/connector"
+	"github.com/sevten/matrix-napcatqq/pkg/connector"
 
 	"maunium.net/go/mautrix/bridgev2/matrix/mxmain"
 )
@@ -17,7 +17,7 @@ var (
 func main() {
 	m := mxmain.BridgeMain{
 		Name:        "mautrix-qq",
-		URL:         "https://github.com/duo/matrix-napcatqq",
+		URL:         "https://github.com/sevten/matrix-napcatqq",
 		Description: "A matrix-napcatqq puppeting bridge.",
 		Version:     "0.2.1",
 		Connector:   &connector.QQConnector{},

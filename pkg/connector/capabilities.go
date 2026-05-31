@@ -23,7 +23,7 @@ func supportedIfFFmpeg() event.CapabilitySupportLevel {
 }
 
 func catpID() string {
-	base := "me.lxduo.qq.capabilities.2025_01_16"
+	base := "com.github.sevten.qq.capabilities.2025_01_16"
 	if ffmpeg.Supported() {
 		return base + "+ffmpeg"
 	}
