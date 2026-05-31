@@ -7,12 +7,10 @@ import (
 	"math/rand/v2"
 	"net/url"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/duo/matrix-qq/pkg/qqid"
 
-	"github.com/LagrangeDev/LagrangeGo/client/entity"
 	"github.com/rs/zerolog"
 	"go.mau.fi/util/jsontime"
 	"go.mau.fi/util/ptr"
@@ -56,12 +54,14 @@ func (qc *QQClient) GetUserInfo(ctx context.Context, ghost *bridgev2.Ghost) (*br
 		return nil, nil
 	}
 
-	id, _ := strconv.ParseUint(string(ghost.ID), 10, 32)
-
-	if info, err := qc.Client.FetchUserInfoUin(uint32(id)); err != nil {
-		return nil, fmt.Errorf("failed to fetch user #%d info", id)
+	sess := qc.session()
+	if sess == nil {
+		return nil, bridgev2.ErrNotLoggedIn
+	}
+	if info, err := sess.GetStrangerInfo(ctx, string(ghost.ID)); err != nil {
+		return nil, fmt.Errorf("failed to fetch user #%s info", ghost.ID)
 	} else {
-		return qc.contactToUserInfo(info), nil
+		return qc.contactToUserInfo(info.UserID.String(), "", info.Nickname), nil
 	}
 }
 
@@ -108,18 +108,23 @@ func (qc *QQClient) getDirectChatInfo(recipient string) (*bridgev2.ChatInfo, err
 	}, nil
 }
 
-func (qc *QQClient) getGroupChatInfo(_ context.Context, portal *bridgev2.Portal) (*bridgev2.ChatInfo, error) {
-	uin, _ := strconv.ParseUint(string(portal.ID), 10, 32)
-
-	groupInfo := qc.Client.GetCachedGroupInfo(uint32(uin))
-	membersInfo := qc.Client.GetCachedMembersInfo(uint32(uin))
-	if groupInfo == nil || membersInfo == nil {
-		return nil, fmt.Errorf("failed to fetch group info")
+func (qc *QQClient) getGroupChatInfo(ctx context.Context, portal *bridgev2.Portal) (*bridgev2.ChatInfo, error) {
+	sess := qc.session()
+	if sess == nil {
+		return nil, bridgev2.ErrNotLoggedIn
+	}
+	groupInfo, err := sess.GetGroupInfo(ctx, string(portal.ID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch group info: %w", err)
+	}
+	membersInfo, err := sess.GetGroupMemberList(ctx, string(portal.ID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch group members: %w", err)
 	}
 
 	wrapped := &bridgev2.ChatInfo{
 		Name:   ptr.Ptr(groupInfo.GroupName),
-		Avatar: wrapAvatar(qqid.GetGroupAvatarURL(groupInfo.GroupUin)),
+		Avatar: wrapAvatar(qqid.GetGroupAvatarURL(groupInfo.GroupID.String())),
 		Members: &bridgev2.ChatMemberList{
 			IsFull:           true,
 			TotalMemberCount: len(membersInfo),
@@ -142,11 +147,11 @@ func (qc *QQClient) getGroupChatInfo(_ context.Context, portal *bridgev2.Portal)
 	}
 
 	for _, m := range membersInfo {
-		evtSender := qc.makeEventSender(fmt.Sprint(m.Uin))
+		evtSender := qc.makeEventSender(m.UserID.String())
 		pl := powerDefault
-		if m.Permission == entity.Owner {
+		if m.Role == "owner" {
 			pl = powerSuperAdmin
-		} else if m.Permission == entity.Admin {
+		} else if m.Role == "admin" {
 			pl = powerAdmin
 		}
 
@@ -160,17 +165,17 @@ func (qc *QQClient) getGroupChatInfo(_ context.Context, portal *bridgev2.Portal)
 	return wrapped, nil
 }
 
-func (qc *QQClient) contactToUserInfo(contact *entity.User) *bridgev2.UserInfo {
+func (qc *QQClient) contactToUserInfo(id, alias, name string) *bridgev2.UserInfo {
 	return &bridgev2.UserInfo{
 		IsBot:        nil,
 		Identifiers:  []string{},
 		ExtraUpdates: updateGhostLastSyncAt,
 		Name: ptr.Ptr(qc.Main.Config.FormatDisplayname(DisplaynameParams{
-			Alias: contact.Remarks,
-			Name:  contact.Nickname,
-			ID:    fmt.Sprint(contact.Uin),
+			Alias: alias,
+			Name:  name,
+			ID:    id,
 		})),
-		Avatar: wrapAvatar(contact.Avatar),
+		Avatar: wrapAvatar(qqid.GetUserAvatarURL(id)),
 	}
 }
 
@@ -256,10 +261,6 @@ func (qc *QQClient) doGhostResync(ctx context.Context, queue map[string]resyncQu
 	log.Debug().Msg("Starting background resyncs")
 	defer log.Debug().Msg("Background resyncs finished")
 
-	qc.Client.RefreshFriendCache()
-	qc.Client.RefreshAllGroupsInfo()
-	qc.Client.RefreshAllGroupMembersCache()
-
 	var ghosts []*bridgev2.Ghost
 	var portals []*bridgev2.Portal
 
@@ -312,22 +313,29 @@ func (qc *QQClient) doGhostResync(ctx context.Context, queue map[string]resyncQu
 	}
 
 	for _, ghost := range ghosts {
-		id, _ := strconv.ParseUint(string(ghost.ID), 10, 32)
-		contact, err := qc.Client.FetchUserInfoUin(uint32(id))
+		sess := qc.session()
+		if sess == nil {
+			log.Warn().Msg("Not logged in, skipping remaining background syncs")
+			return
+		}
+		contact, err := sess.GetStrangerInfo(ctx, string(ghost.ID))
 		if err != nil {
-			log.Warn().Uint64("id", id).Msg("Failed to get user info for puppet in background sync")
+			log.Warn().Str("id", string(ghost.ID)).Msg("Failed to get user info for puppet in background sync")
 			continue
 		}
 
-		ghost.UpdateInfo(ctx, qc.contactToUserInfo(contact))
+		ghost.UpdateInfo(ctx, qc.contactToUserInfo(contact.UserID.String(), "", contact.Nickname))
 	}
 }
 
 func (qc *QQClient) updateMemberDisplyname(ctx context.Context, portal *bridgev2.Portal) bool {
-	groupID, _ := strconv.ParseUint(string(portal.ID), 10, 32)
-	if members := qc.Client.GetCachedMembersInfo(uint32(groupID)); members != nil {
+	sess := qc.session()
+	if sess == nil {
+		return false
+	}
+	if members, err := sess.GetGroupMemberList(ctx, string(portal.ID)); err == nil {
 		for _, member := range members {
-			memberIntent := portal.GetIntentFor(ctx, qc.makeEventSender(fmt.Sprint(member.Uin)), qc.UserLogin, bridgev2.RemoteEventChatInfoChange)
+			memberIntent := portal.GetIntentFor(ctx, qc.makeEventSender(member.UserID.String()), qc.UserLogin, bridgev2.RemoteEventChatInfoChange)
 
 			mxid := memberIntent.GetMXID()
 
@@ -337,7 +345,7 @@ func (qc *QQClient) updateMemberDisplyname(ctx context.Context, portal *bridgev2
 				continue
 			}
 
-			displayName := cmp.Or(member.Remarks, member.MemberCard, member.Nickname)
+			displayName := cmp.Or(member.Card, member.Nickname)
 			if memberInfo.Displayname != displayName {
 				memberInfo.Displayname = displayName
 

@@ -55,11 +55,9 @@ func (evt *QQMessageEvent) GetTimestamp() time.Time {
 }
 
 func (evt *QQMessageEvent) GetType() bridgev2.RemoteEventType {
-	/*
-		if evt.Message.Type == qqid.MsgRevoke {
-			return bridgev2.RemoteEventMessageRemove
-		}
-	*/
+	if evt.Message.Type == qqid.MsgRevoke {
+		return bridgev2.RemoteEventMessageRemove
+	}
 	return bridgev2.RemoteEventMessage
 }
 
@@ -93,5 +91,5 @@ func (evt *QQMessageEvent) PostHandle(ctx context.Context, portal *bridgev2.Port
 func (evt *QQMessageEvent) ConvertMessage(ctx context.Context, portal *bridgev2.Portal, intent bridgev2.MatrixAPI) (*bridgev2.ConvertedMessage, error) {
 	evt.qc.EnqueuePortalResync(portal)
 
-	return evt.qc.Main.MsgConv.ToMatrix(ctx, evt.qc.Client, portal, intent, evt.Message), nil
+	return evt.qc.Main.MsgConv.ToMatrix(ctx, evt.qc.session(), portal, intent, evt.Message), nil
 }

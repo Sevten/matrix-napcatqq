@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/LagrangeDev/LagrangeGo/client"
+	"github.com/duo/matrix-qq/pkg/onebot"
 	"github.com/duo/matrix-qq/pkg/qqid"
 	"maunium.net/go/mautrix/bridge/status"
 	"maunium.net/go/mautrix/bridgev2"
@@ -21,7 +21,6 @@ type resyncQueueItem struct {
 type QQClient struct {
 	Main      *QQConnector
 	UserLogin *bridgev2.UserLogin
-	Client    *client.QQClient
 
 	stopLoops       atomic.Pointer[context.CancelFunc]
 	resyncQueue     map[string]resyncQueueItem
@@ -35,23 +34,14 @@ var (
 )
 
 func (qc *QQClient) Connect(ctx context.Context) {
-	if qc.Client == nil {
+	if !qc.IsLoggedIn() {
 		state := status.BridgeState{
 			StateEvent: status.StateBadCredentials,
-			Message:    "You're not logged into QQ",
+			Message:    "NapCatQQ is not connected for this QQ account",
 		}
 		qc.UserLogin.BridgeState.Send(state)
 		return
 	}
-
-	qc.Client.PrivateMessageEvent.Subscribe(qc.handlePrivateMessage)
-	qc.Client.GroupMessageEvent.Subscribe(qc.handleGroupMessage)
-	qc.Client.FriendRecallEvent.Subscribe(qc.handleFriendRecall)
-	qc.Client.GroupRecallEvent.Subscribe(qc.handleGroupRecall)
-
-	qc.Client.RefreshFriendCache()
-	qc.Client.RefreshAllGroupsInfo()
-	qc.Client.RefreshAllGroupMembersCache()
 
 	qc.startLoops()
 }
@@ -62,10 +52,6 @@ func (qc *QQClient) Disconnect() {
 		(*stopSyncLoop)()
 	}
 
-	if cli := qc.Client; cli != nil {
-		cli.Release()
-		qc.Client = nil
-	}
 }
 
 func (qc *QQClient) LogoutRemote(ctx context.Context) {
@@ -76,7 +62,7 @@ func (qc *QQClient) LogoutRemote(ctx context.Context) {
 }
 
 func (qc *QQClient) IsLoggedIn() bool {
-	return qc.Client.Online.Load()
+	return qc.session() != nil
 }
 
 func (qc *QQClient) IsThisUser(ctx context.Context, userID networkid.UserID) bool {
@@ -91,4 +77,15 @@ func (qc *QQClient) startLoops() {
 	}
 
 	go qc.ghostResyncLoop(ctx)
+}
+
+func (qc *QQClient) session() *onebot.Session {
+	if qc.Main.OneBot == nil {
+		return nil
+	}
+	sess := qc.Main.OneBot.GetSession(string(qc.UserLogin.ID))
+	if sess == nil || !sess.IsConnected() {
+		return nil
+	}
+	return sess
 }

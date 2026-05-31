@@ -1,13 +1,14 @@
 package qqid
 
 import (
-	"github.com/LagrangeDev/LagrangeGo/client/auth"
 	"go.mau.fi/util/jsontime"
 )
 
 type UserLoginMetadata struct {
-	Device *auth.DeviceInfo `json:"device"`
-	Token  []byte           `json:"token"`
+	SelfID        string        `json:"self_id,omitempty"`
+	Nickname      string        `json:"nickname,omitempty"`
+	ConnectedAt   jsontime.Unix `json:"connected_at,omitempty"`
+	ConnectionTag string        `json:"connection_tag,omitempty"`
 }
 
 type GhostMetadata struct {

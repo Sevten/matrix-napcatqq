@@ -18,7 +18,12 @@ type Config struct {
 	DisplaynameTemplate string             `yaml:"displayname_template"`
 	displaynameTemplate *template.Template `yaml:"-"`
 
-	SignServers []string `yaml:"sign_servers"`
+	NapCat struct {
+		ListenAddress  string `yaml:"listen_address"`
+		WebSocketPath  string `yaml:"websocket_path"`
+		AccessToken    string `yaml:"access_token"`
+		RequestTimeout uint   `yaml:"request_timeout"`
+	} `yaml:"napcat"`
 
 	Reconnect struct {
 		Delay    uint `yaml:"delay"`

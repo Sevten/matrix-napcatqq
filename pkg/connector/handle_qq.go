@@ -2,88 +2,117 @@ package connector
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/duo/matrix-qq/pkg/onebot"
 	"github.com/duo/matrix-qq/pkg/qqid"
-
-	"github.com/LagrangeDev/LagrangeGo/client"
-	"github.com/LagrangeDev/LagrangeGo/client/event"
-	"github.com/LagrangeDev/LagrangeGo/message"
+	"maunium.net/go/mautrix/bridgev2/networkid"
 )
 
-func (qc *QQClient) handlePrivateMessage(_ *client.QQClient, msg *message.PrivateMessage) {
-	qc.UserLogin.Log.Trace().Any("message", msg).Msg("Receive QQ private message")
-
-	if len(msg.Elements) == 0 {
-		qc.UserLogin.Log.Warn().Any("message", msg).Msg("Recevie QQ empty private message")
+func (qc *QQConnector) handleOneBotEvent(sess *onebot.Session, evt *onebot.Event) {
+	if evt.PostType == "meta_event" {
 		return
+	}
+	selfID := sess.SelfID()
+	if selfID == "" {
+		selfID = evt.SelfID.String()
+	}
+	login := qc.Bridge.GetCachedUserLoginByID(networkid.UserLoginID(selfID))
+	if login == nil {
+		qc.Bridge.Log.Trace().
+			Str("self_id", selfID).
+			Str("post_type", evt.PostType).
+			Msg("Dropping OneBot event for unbound NapCatQQ account")
+		return
+	}
+	client, ok := login.Client.(*QQClient)
+	if !ok || client == nil {
+		return
+	}
+
+	switch evt.PostType {
+	case "message", "message_sent":
+		client.handleOneBotMessage(evt)
+	case "notice":
+		client.handleOneBotNotice(evt)
+	}
+}
+
+func (qc *QQClient) handleOneBotMessage(evt *onebot.Event) {
+	qc.UserLogin.Log.Trace().Any("event", evt).Msg("Receive QQ message")
+	if len(evt.Message) == 0 {
+		qc.UserLogin.Log.Warn().Any("event", evt).Msg("Receive empty QQ message")
+		return
+	}
+
+	chatID, chatType := qc.chatFromEvent(evt)
+	senderID := evt.Sender.UserID.String()
+	if senderID == "" {
+		senderID = evt.UserID.String()
+	}
+	if evt.PostType == "message_sent" && senderID == "" {
+		senderID = string(qc.UserLogin.ID)
 	}
 
 	qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &QQMessageEvent{
 		Message: &qqid.Message{
-			ID:        fmt.Sprint(msg.ID),
-			Timestamp: int64(msg.Time) * 1000,
-			Type:      qqid.ParseMessageType(msg.Elements),
-			ChatID:    fmt.Sprint(msg.Sender.Uin),
-			ChatType:  qqid.ChatPrivate,
-			SenderID:  fmt.Sprint(msg.Sender.Uin),
-			Elements:  msg.Elements,
+			ID:        evt.MessageID.String(),
+			Timestamp: eventTimestamp(evt),
+			Type:      qqid.ParseMessageType(evt.Message),
+			ChatID:    chatID,
+			ChatType:  chatType,
+			SenderID:  senderID,
+			Elements:  evt.Message,
 		},
 		qc: qc,
 	})
 }
 
-func (qc *QQClient) handleGroupMessage(_ *client.QQClient, msg *message.GroupMessage) {
-	qc.UserLogin.Log.Trace().Any("message", msg).Msg("Receive QQ group message")
-
-	if len(msg.Elements) == 0 {
-		qc.UserLogin.Log.Warn().Any("message", msg).Msg("Recevie QQ empty group message")
+func (qc *QQClient) handleOneBotNotice(evt *onebot.Event) {
+	if evt.NoticeType != "friend_recall" && evt.NoticeType != "group_recall" {
 		return
+	}
+
+	chatID, chatType := qc.chatFromEvent(evt)
+	senderID := evt.OperatorID.String()
+	if senderID == "" {
+		senderID = evt.UserID.String()
+	}
+	if senderID == "" {
+		senderID = string(qc.UserLogin.ID)
 	}
 
 	qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &QQMessageEvent{
 		Message: &qqid.Message{
-			ID:        fmt.Sprint(msg.ID),
-			Timestamp: int64(msg.Time) * 1000,
-			Type:      qqid.ParseMessageType(msg.Elements),
-			ChatID:    fmt.Sprint(msg.GroupUin),
-			ChatType:  qqid.ChatGroup,
-			SenderID:  fmt.Sprint(msg.Sender.Uin),
-			Elements:  msg.Elements,
+			ID:        evt.MessageID.String(),
+			Timestamp: eventTimestamp(evt),
+			Type:      qqid.MsgRevoke,
+			ChatID:    chatID,
+			ChatType:  chatType,
+			SenderID:  senderID,
+			Elements:  nil,
 		},
 		qc: qc,
 	})
 }
 
-func (qc *QQClient) handleFriendRecall(_ *client.QQClient, evt *event.FriendRecall) {
-	qc.UserLogin.Log.Trace().Any("event", evt).Msg("Receive QQ friend recall event")
-
-	qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &QQMessageEvent{
-		Message: &qqid.Message{
-			ID:        fmt.Sprint(evt.Sequence),
-			Timestamp: int64(evt.Time) * 1000,
-			Type:      qqid.MsgRevoke,
-			ChatID:    fmt.Sprint(evt.FromUin),
-			ChatType:  qqid.ChatPrivate,
-			SenderID:  fmt.Sprint(evt.FromUin),
-			Elements:  make([]message.IMessageElement, 0),
-		},
-		qc: qc,
-	})
+func (qc *QQClient) chatFromEvent(evt *onebot.Event) (string, qqid.ChatType) {
+	if evt.GroupID != "" || evt.MessageType == "group" {
+		return evt.GroupID.String(), qqid.ChatGroup
+	}
+	chatID := evt.UserID.String()
+	if chatID == "" && evt.Sender.UserID != "" {
+		chatID = evt.Sender.UserID.String()
+	}
+	if chatID == "" {
+		chatID = fmt.Sprint(qc.UserLogin.ID)
+	}
+	return chatID, qqid.ChatPrivate
 }
 
-func (qc *QQClient) handleGroupRecall(_ *client.QQClient, evt *event.GroupRecall) {
-	qc.UserLogin.Log.Trace().Any("event", evt).Msg("Receive QQ group recall event")
-
-	qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &QQMessageEvent{
-		Message: &qqid.Message{
-			ID:        fmt.Sprint(evt.Sequence),
-			Timestamp: int64(evt.Time) * 1000,
-			Type:      qqid.MsgRevoke,
-			ChatID:    fmt.Sprint(evt.GroupUin),
-			ChatType:  qqid.ChatGroup,
-			SenderID:  fmt.Sprint(evt.OperatorUin),
-			Elements:  make([]message.IMessageElement, 0),
-		},
-		qc: qc,
-	})
+func eventTimestamp(evt *onebot.Event) int64 {
+	if evt.Time == 0 {
+		return time.Now().UnixMilli()
+	}
+	return evt.Time * 1000
 }

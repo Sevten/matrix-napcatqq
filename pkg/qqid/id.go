@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/LagrangeDev/LagrangeGo/message"
+	"github.com/duo/matrix-qq/pkg/onebot"
 	"maunium.net/go/mautrix/bridgev2/networkid"
 )
 
@@ -39,23 +39,24 @@ type Message struct {
 	ChatType  ChatType
 	SenderID  string
 
-	Elements []message.IMessageElement
+	Elements []onebot.Segment
 }
 
-func ParseMessageType(elems []message.IMessageElement) MessageType {
+func ParseMessageType(elems []onebot.Segment) MessageType {
 	for _, elem := range elems {
-		switch elem.Type() {
-		case message.Image:
+		switch elem.Type {
+		case "image":
 			return MsgImage
-		case message.Voice:
+		case "record":
 			return MsgAudio
-		case message.Video:
+		case "video":
 			return MsgVideo
-		case message.File:
+		case "file":
 			return MsgFile
-		case message.Forward:
-		case message.Service, message.LightApp:
+		case "json", "xml", "forward":
 			return MsgApp
+		case "location":
+			return MsgLocation
 		}
 	}
 

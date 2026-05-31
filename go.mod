@@ -5,9 +5,9 @@ go 1.23.0
 toolchain go1.23.4
 
 require (
-	github.com/LagrangeDev/LagrangeGo v0.1.3-0.20250111034447-91650c0c29cd
 	github.com/antchfx/xmlquery v1.4.3
 	github.com/gabriel-vasile/mimetype v1.4.8
+	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/pinwang5776/silk v0.0.0-20241104071310-465b0cd98da5
 	github.com/rs/zerolog v1.33.0
@@ -27,7 +27,6 @@ require (
 	github.com/fumiama/imgsz v0.0.4 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect

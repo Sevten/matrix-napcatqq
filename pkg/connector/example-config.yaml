@@ -4,10 +4,13 @@
 #  .ID - The internal user ID of the user.
 displayname_template: '{{or .Alias .Name "Unknown user"}}'
 
-# Sign servers
-sign_servers:
-  - https://sign.lagrangecore.org/api/sign/30366
-  - https://sign.0w0.ing/api/sign/30366
+# NapCatQQ reverse WebSocket server. Start matrix-qq first, then configure
+# each NapCatQQ instance to connect to ws://matrix-qq:8080/onebot/v11/ws.
+napcat:
+  listen_address: 0.0.0.0:8080
+  websocket_path: /onebot/v11/ws
+  access_token: ""
+  request_timeout: 30
 
 reconnect:
   delay: 3

@@ -2,17 +2,14 @@ package msgconv
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/duo/matrix-qq/pkg/qqid"
-
-	"github.com/LagrangeDev/LagrangeGo/client"
-	"github.com/LagrangeDev/LagrangeGo/message"
-	"github.com/rs/zerolog"
+	"github.com/duo/matrix-qq/pkg/onebot"
 	"maunium.net/go/mautrix/bridgev2"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/format"
@@ -21,147 +18,118 @@ import (
 
 func (mc *MessageConverter) ToQQ(
 	ctx context.Context,
-	client *client.QQClient,
 	evt *event.Event,
 	content *event.MessageEventContent,
 	portal *bridgev2.Portal,
-) ([]message.IMessageElement, error) {
-	ctx = context.WithValue(ctx, contextKeyClient, client)
+) ([]onebot.Segment, error) {
 	ctx = context.WithValue(ctx, contextKeyPortal, portal)
 
 	if evt.Type == event.EventSticker {
 		content.MsgType = event.MessageType(event.EventSticker.Type)
 	}
 
-	elements := []message.IMessageElement{}
-
 	switch content.MsgType {
 	case event.MsgText, event.MsgNotice, event.MsgEmote:
-		elements = append(elements, mc.constructTextMessage(ctx, content)...)
+		return mc.constructTextMessage(ctx, content), nil
 	case event.MessageType(event.EventSticker.Type), event.MsgImage, event.MsgVideo, event.MsgAudio:
 		data, err := mc.Bridge.Bot.DownloadMedia(ctx, content.URL, content.File)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", bridgev2.ErrMediaDownloadFailed, err)
 		}
-		elements = append(elements, mc.constructMediaMessage(ctx, content, data)...)
+		return mc.constructMediaMessage(content, data), nil
+	case event.MsgFile:
+		data, err := mc.Bridge.Bot.DownloadMedia(ctx, content.URL, content.File)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", bridgev2.ErrMediaDownloadFailed, err)
+		}
+		return mc.constructFileMessage(content, data), nil
 	case event.MsgLocation:
 		lat, lng, err := parseGeoURI(content.GeoURI)
 		if err != nil {
 			return nil, err
 		}
-		elements = append(elements, mc.constructLocationMessage(ctx, content.Body, lat, lng)...)
+		return mc.constructLocationMessage(content.Body, lat, lng), nil
 	default:
 		return nil, fmt.Errorf("%w %s", bridgev2.ErrUnsupportedMessageType, content.MsgType)
-
 	}
-
-	return elements, nil
 }
 
-func (mc *MessageConverter) constructTextMessage(ctx context.Context, content *event.MessageEventContent) []message.IMessageElement {
+func (mc *MessageConverter) constructTextMessage(ctx context.Context, content *event.MessageEventContent) []onebot.Segment {
 	text, mentions := mc.parseText(ctx, content)
 	if content.Mentions != nil && content.Mentions.Room {
-		mentions = append(mentions, "room")
+		mentions = append(mentions, "all")
 	}
-
 	if len(mentions) == 0 {
-		return []message.IMessageElement{message.NewText(text)}
+		return []onebot.Segment{onebot.Text(text)}
 	}
 
 	keywords := make([]string, len(mentions))
 	for i, m := range mentions {
 		keywords[i] = "@" + m
 	}
-
 	pattern := strings.Join(keywords, "|")
 	re := regexp.MustCompile("(?:" + pattern + ")")
 
 	parts := re.Split(text, -1)
 	matches := re.FindAllString(text, -1)
 
-	var splits []string
+	segments := []onebot.Segment{}
 	for i := 0; i < len(parts); i++ {
 		if parts[i] != "" {
-			splits = append(splits, parts[i])
+			segments = append(segments, onebot.Text(parts[i]))
 		}
 		if i < len(matches) {
-			splits = append(splits, matches[i])
-		}
-	}
-
-	elems := []message.IMessageElement{}
-	for _, s := range splits {
-		if slices.Contains(keywords, s) {
-			if s == "@room" {
-				elems = append(elems, message.NewAt(0))
-			} else {
-				uin, _ := strconv.ParseUint(string(s[1:]), 10, 32)
-				elems = append(elems, message.NewAt(uint32(uin)))
+			match := matches[i]
+			if slices.Contains(keywords, match) {
+				if match == "@all" || match == "@room" {
+					segments = append(segments, onebot.At("all"))
+				} else {
+					segments = append(segments, onebot.At(match[1:]))
+				}
 			}
-		} else {
-			elems = append(elems, message.NewText(s))
 		}
 	}
-
-	return elems
+	return segments
 }
 
-func (mc *MessageConverter) constructMediaMessage(_ context.Context, content *event.MessageEventContent, data []byte) []message.IMessageElement {
-	fileName := content.Body
-	if content.FileName != "" {
-		fileName = content.FileName
-	}
-
+func (mc *MessageConverter) constructMediaMessage(content *event.MessageEventContent, data []byte) []onebot.Segment {
+	file := "base64://" + base64.StdEncoding.EncodeToString(data)
 	switch content.MsgType {
 	case event.MessageType(event.EventSticker.Type), event.MsgImage:
-		return []message.IMessageElement{message.NewImage(data)}
+		return []onebot.Segment{onebot.NewSegment("image", map[string]any{"file": file})}
 	case event.MsgVideo:
-		return []message.IMessageElement{message.NewVideo(data, qqid.SmallestImg)}
+		return []onebot.Segment{onebot.NewSegment("video", map[string]any{"file": file})}
 	case event.MsgAudio:
-		data, _ := ogg2silk(data)
-		// TODO: ogg to silk
-		return []message.IMessageElement{message.NewRecord(data)}
-	case event.MsgFile:
-		// FIXME:
-		return []message.IMessageElement{message.NewFile(data, fileName)}
+		if silk, err := ogg2silk(data); err == nil {
+			file = "base64://" + base64.StdEncoding.EncodeToString(silk)
+		}
+		return []onebot.Segment{onebot.NewSegment("record", map[string]any{"file": file})}
 	}
-
-	return []message.IMessageElement{}
+	return nil
 }
 
-func (mc *MessageConverter) constructLocationMessage(_ context.Context, name string, lat, lng float64) []message.IMessageElement {
-	locationJson := fmt.Sprintf(`
-		{
-			"app": "com.tencent.map",
-			"desc": "地图",
-			"view": "LocationShare",
-			"ver": "0.0.0.1",
-			"prompt": "[位置]%s",
-			"from": 1,
-			"meta": {
-			  "Location.Search": {
-				"id": "12250896297164027526",
-				"name": "%s",
-				"address": "%s",
-				"lat": "%.5f",
-				"lng": "%.5f",
-				"from": "plusPanel"
-			  }
-			},
-			"config": {
-			  "forward": 1,
-			  "autosize": 1,
-			  "type": "card"
-			}
-		}
-		`, name, name, name, lat, lng)
+func (mc *MessageConverter) constructFileMessage(content *event.MessageEventContent, data []byte) []onebot.Segment {
+	name := content.Body
+	if content.FileName != "" {
+		name = content.FileName
+	}
+	return []onebot.Segment{onebot.NewSegment("file", map[string]any{
+		"file": "base64://" + base64.StdEncoding.EncodeToString(data),
+		"name": name,
+	})}
+}
 
-	return []message.IMessageElement{message.NewLightApp(locationJson)}
+func (mc *MessageConverter) constructLocationMessage(name string, lat, lng float64) []onebot.Segment {
+	return []onebot.Segment{onebot.NewSegment("location", map[string]any{
+		"lat":     fmt.Sprintf("%.5f", lat),
+		"lon":     fmt.Sprintf("%.5f", lng),
+		"title":   name,
+		"content": name,
+	})}
 }
 
 func (mc *MessageConverter) parseText(ctx context.Context, content *event.MessageEventContent) (text string, mentions []string) {
 	mentions = make([]string, 0)
-
 	parseCtx := format.NewContext(ctx)
 	parseCtx.ReturnData["allowed_mentions"] = content.Mentions
 	parseCtx.ReturnData["output_mentions"] = &mentions
@@ -184,12 +152,10 @@ func (mc *MessageConverter) convertPill(displayname, mxid, eventID string, ctx f
 	var oid string
 	ghost, err := mc.Bridge.GetGhostByMXID(ctx.Ctx, id.UserID(mxid))
 	if err != nil {
-		zerolog.Ctx(ctx.Ctx).Err(err).Str("mxid", mxid).Msg("Failed to get ghost for mention")
 		return displayname
 	} else if ghost != nil {
 		oid = string(ghost.ID)
 	} else if user, err := mc.Bridge.GetExistingUserByMXID(ctx.Ctx, id.UserID(mxid)); err != nil {
-		zerolog.Ctx(ctx.Ctx).Err(err).Str("mxid", mxid).Msg("Failed to get user for mention")
 		return displayname
 	} else if user != nil {
 		portal := getPortal(ctx.Ctx)
@@ -211,9 +177,7 @@ func parseGeoURI(uri string) (lat, lng float64, err error) {
 		err = fmt.Errorf("uri doesn't have geo: prefix")
 		return
 	}
-	// Remove geo: prefix and anything after ;
 	coordinates := strings.Split(strings.TrimPrefix(uri, "geo:"), ";")[0]
-
 	if splitCoordinates := strings.Split(coordinates, ","); len(splitCoordinates) != 2 {
 		err = fmt.Errorf("didn't find exactly two numbers separated by a comma")
 	} else if lat, err = strconv.ParseFloat(splitCoordinates[0], 64); err != nil {

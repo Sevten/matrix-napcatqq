@@ -19,7 +19,7 @@ const (
 
 var (
 	avatarSizes = []int{0, 640, 140, 100, 41, 40}
-	lruCache    *lru.Cache[uint32, string]
+	lruCache    *lru.Cache[string, string]
 	once        sync.Once
 
 	tlsCipherSuites = []uint16{
@@ -138,14 +138,14 @@ func HTTPGetReadCloser(url string) (io.ReadCloser, error) {
 	return resp.Body, err
 }
 
-func GetUserAvatarURL(uin uint32) string {
+func GetUserAvatarURL(uin string) string {
 	if url, ok := getAvatarCache().Get(uin); ok {
 		return url
 	}
 
 	url := ""
 	for _, size := range avatarSizes {
-		url = fmt.Sprintf("https://q.qlogo.cn/headimg_dl?dst_uin=%d&spec=%d", uin, size)
+		url = fmt.Sprintf("https://q.qlogo.cn/headimg_dl?dst_uin=%s&spec=%d", uin, size)
 		data, err := GetBytes(url)
 		if err != nil || fmt.Sprintf("%x", md5.Sum(data)) == defaultAvatar {
 			continue
@@ -158,13 +158,13 @@ func GetUserAvatarURL(uin uint32) string {
 	return url
 }
 
-func GetGroupAvatarURL(groupId uint32) string {
-	return fmt.Sprintf("https://p.qlogo.cn/gh/%d/%d/0", groupId, groupId)
+func GetGroupAvatarURL(groupId string) string {
+	return fmt.Sprintf("https://p.qlogo.cn/gh/%s/%s/0", groupId, groupId)
 }
 
-func getAvatarCache() *lru.Cache[uint32, string] {
+func getAvatarCache() *lru.Cache[string, string] {
 	once.Do(func() {
-		lruCache, _ = lru.New[uint32, string](1024)
+		lruCache, _ = lru.New[string, string](1024)
 	})
 	return lruCache
 }

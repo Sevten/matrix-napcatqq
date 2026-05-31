@@ -1,8 +1,25 @@
 # matrix-qq
-A Matrix-QQ puppeting bridge based on [LagrangeGo](https://github.com/LagrangeDev/LagrangeGo) and [mautrix-go](https://github.com/mautrix/go).
+A Matrix-QQ puppeting bridge based on [NapCatQQ](https://github.com/NapNeko/NapCatQQ), [OneBot 11](https://github.com/botuniverse/onebot-11), and [mautrix-go](https://github.com/mautrix/go).
 
-### Alternative 
-* [Matrix-Pylon](https://github.com/duo/matrix-pylon) support for agent access using the [OneBot](https://github.com/botuniverse/onebot-11) protocol
+### NapCatQQ
+
+matrix-qq listens as a OneBot 11 reverse WebSocket server. Start the bridge first, then configure each NapCatQQ instance to connect to the bridge endpoint, for example:
+
+```yaml
+napcat:
+  listen_address: 0.0.0.0:8080
+  websocket_path: /onebot/v11/ws
+  access_token: ""
+  request_timeout: 30
+```
+
+NapCatQQ reverse WebSocket URL:
+
+```text
+ws://matrix-qq:8080/onebot/v11/ws
+```
+
+After NapCatQQ connects, use the bridge login flow and enter the QQ number to bind that connected account to your Matrix user. Multiple NapCatQQ instances can connect to the same endpoint; events and API calls are routed by `self_id`.
 
 ### Documentation
 
@@ -76,7 +93,7 @@ Some quick links:
     * [x] Avatar
   * [ ] Login types
 	  * [ ] Password
-	  * [x] QR code
+	  * [x] NapCatQQ reverse WebSocket binding
 
 * Misc
   * [ ] Automatic portal creation
