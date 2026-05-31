@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/duo/matrix-qq/pkg/msgconv"
-	"github.com/duo/matrix-qq/pkg/onebot"
+	"github.com/sevten/matrix-napcatqq/pkg/msgconv"
+	"github.com/sevten/matrix-napcatqq/pkg/onebot"
 
 	"maunium.net/go/mautrix/bridgev2"
 )
@@ -55,10 +55,10 @@ func (qc *QQConnector) SetMaxFileSize(maxSize int64) {
 func (qc *QQConnector) GetName() bridgev2.BridgeName {
 	return bridgev2.BridgeName{
 		DisplayName:      "Matrix QQ",
-		NetworkURL:       "https://github.com/duo/matrix-qq",
+		NetworkURL:       "https://github.com/sevten/matrix-napcatqq",
 		NetworkIcon:      "mxc://matrix.org/nKrjlWVnjIGQRJicsBqDFLnc",
 		NetworkID:        "qq",
-		BeeperBridgeType: "github.com/duo/matrix-qq",
+		BeeperBridgeType: "github.com/sevten/matrix-napcatqq",
 		DefaultPort:      17777,
 	}
 }

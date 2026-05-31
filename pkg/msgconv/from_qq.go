@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/antchfx/xmlquery"
-	"github.com/duo/matrix-qq/pkg/onebot"
-	"github.com/duo/matrix-qq/pkg/qqid"
+	"github.com/sevten/matrix-napcatqq/pkg/onebot"
+	"github.com/sevten/matrix-napcatqq/pkg/qqid"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/rs/zerolog"
 	"github.com/tidwall/gjson"

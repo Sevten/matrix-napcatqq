@@ -1,7 +1,7 @@
 package connector
 
 import (
-	"github.com/duo/matrix-qq/pkg/qqid"
+	"github.com/sevten/matrix-napcatqq/pkg/qqid"
 
 	"maunium.net/go/mautrix/bridgev2/database"
 )

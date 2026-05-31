@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/duo/matrix-qq/pkg/qqid"
+	"github.com/sevten/matrix-napcatqq/pkg/qqid"
 	"go.mau.fi/util/jsontime"
 	"maunium.net/go/mautrix/bridgev2"
 	"maunium.net/go/mautrix/bridgev2/database"

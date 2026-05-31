@@ -1,4 +1,4 @@
-module github.com/duo/matrix-qq
+module github.com/sevten/matrix-napcatqq
 
 go 1.23.0
 

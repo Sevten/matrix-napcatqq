@@ -1,33 +1,96 @@
-# matrix-qq
-A Matrix-QQ puppeting bridge based on [NapCatQQ](https://github.com/NapNeko/NapCatQQ), [OneBot 11](https://github.com/botuniverse/onebot-11), and [mautrix-go](https://github.com/mautrix/go).
+# matrix-napcatqq
+A matrix-napcatqq puppeting bridge based on [NapCatQQ](https://github.com/NapNeko/NapCatQQ), [OneBot 11](https://github.com/botuniverse/onebot-11), and [mautrix-go](https://github.com/mautrix/go).
 
-### NapCatQQ
+## Setup & Usage
 
-matrix-qq listens as a OneBot 11 reverse WebSocket server. Start the bridge first, then configure each NapCatQQ instance to connect to the bridge endpoint, for example:
+### 1. Configure matrix-napcatqq
+
+We recommend running the bridge using Docker. First, create a working directory and generate the initial configuration file:
+
+```bash
+mkdir -p /data/matrix-napcatqq
+# The first run will generate a default config.yaml
+docker run --rm -v /data/matrix-napcatqq:/data lxduo/matrix-napcatqq
+```
+
+Edit the generated `config.yaml` in your `/data/matrix-napcatqq` directory. Ensure you configure the following sections:
+- `homeserver`: Set your Matrix homeserver address (e.g., `http://localhost:8008`) and domain.
+- `appservice`: Configure the bridge's local listening address and port (e.g., `0.0.0.0:29332`).
+- `napcat`: Configure the OneBot reverse WebSocket server where NapCatQQ will connect.
+  ```yaml
+  napcat:
+    listen_address: 0.0.0.0:8080
+    websocket_path: /onebot/v11/ws
+    access_token: "your_secret_token" # Highly recommended to set a token
+  ```
+
+Next, generate the appservice registration file for Synapse by running the container again:
+
+```bash
+# The second run will generate registration.yaml based on your config
+docker run --rm -v /data/matrix-napcatqq:/data lxduo/matrix-napcatqq
+```
+This command creates a `registration.yaml` file.
+
+### 2. Configure Synapse
+
+Copy the generated `registration.yaml` to your Synapse configuration directory. Then, edit your Synapse `homeserver.yaml` to include the appservice:
 
 ```yaml
-napcat:
-  listen_address: 0.0.0.0:8080
-  websocket_path: /onebot/v11/ws
-  access_token: ""
-  request_timeout: 30
+app_service_config_files:
+  - /path/to/your/synapse/registration.yaml
 ```
 
-NapCatQQ reverse WebSocket URL:
-
-```text
-ws://matrix-qq:8080/onebot/v11/ws
+Restart Synapse to apply the configuration:
+```bash
+systemctl restart matrix-synapse
 ```
 
-After NapCatQQ connects, use the bridge login flow and enter the QQ number to bind that connected account to your Matrix user. Multiple NapCatQQ instances can connect to the same endpoint; events and API calls are routed by `self_id`.
+### 3. Configure NapCatQQ
+
+matrix-napcatqq listens as a OneBot 11 reverse WebSocket server. Start the bridge first, then configure each NapCatQQ instance to connect to the bridge endpoint.
+
+In your NapCatQQ configuration (e.g., `onebot11.json` or via WebUI), add a reverse WebSocket connection:
+
+```json
+{
+  "network": {
+    "websocketReverses": [
+      {
+        "url": "ws://<matrix-napcatqq-ip>:8080/onebot/v11/ws",
+        "enable": true
+      }
+    ]
+  }
+}
+```
+
+*Note: Replace `<matrix-napcatqq-ip>` with the actual IP address of the machine running matrix-napcatqq. If you set an `access_token` in step 1, ensure you append it as a header or query parameter in NapCatQQ, depending on how NapCatQQ handles OneBot v11 auth.*
+
+### 4. Start and Bind
+
+1. Start the `matrix-napcatqq` bridge using Docker:
+   ```bash
+   docker run -d --name matrix-napcatqq \
+     -v /data/matrix-napcatqq:/data \
+     -p 8080:8080 \
+     -p 29332:29332 \
+     lxduo/matrix-napcatqq
+   ```
+2. Start `NapCatQQ`. You should see successful connection logs in the `matrix-napcatqq` output (`docker logs matrix-napcatqq`).
+3. Open your Matrix client (e.g., Element) and start a direct chat with the bridge management bot (usually `@qqbot:yourdomain.com`).
+4. Send the `login` command to the bot and enter your QQ number. This binds the connected NapCatQQ session to your Matrix user.
+
+Multiple NapCatQQ instances can connect to the same bridge endpoint; events and API calls are automatically routed by `self_id`.
+
 
 ### Documentation
 
 Some quick links:
 
 * [Bridge setup](https://docs.mau.fi/bridges/go/setup.html)
-* [Docker](https://hub.docker.com/r/lxduo/matrix-qq)
-* [Step by Step (Chinese)](https://duo.github.io/posts/matrix-qq-wechat/)
+* [Docker](https://hub.docker.com/r/lxduo/matrix-napcatqq)
+* [Step by Step (Chinese)](https://duo.github.io/posts/matrix-napcatqq-wechat/)
 
 ### Features & roadmap
 

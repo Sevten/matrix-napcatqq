@@ -9,7 +9,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/duo/matrix-qq/pkg/qqid"
+	"github.com/sevten/matrix-napcatqq/pkg/qqid"
 
 	"github.com/rs/zerolog"
 	"go.mau.fi/util/jsontime"

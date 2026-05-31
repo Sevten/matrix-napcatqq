@@ -13,7 +13,7 @@ ENV UID=1337 \
 
 RUN apk add --no-cache ffmpeg su-exec ca-certificates olm bash jq yq-go curl
 
-COPY --from=builder /build/matrix-qq /usr/bin/matrix-qq
+COPY --from=builder /build/matrix-napcatqq /usr/bin/matrix-napcatqq
 COPY --from=builder /build/docker-run.sh /docker-run.sh
 VOLUME /data
 

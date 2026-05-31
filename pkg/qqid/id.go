@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/duo/matrix-qq/pkg/onebot"
+	"github.com/sevten/matrix-napcatqq/pkg/onebot"
 	"maunium.net/go/mautrix/bridgev2/networkid"
 )
 
