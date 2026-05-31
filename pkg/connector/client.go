@@ -8,7 +8,7 @@ import (
 
 	"github.com/sevten/matrix-napcatqq/pkg/onebot"
 	"github.com/sevten/matrix-napcatqq/pkg/qqid"
-	"maunium.net/go/mautrix/bridge/status"
+	"maunium.net/go/mautrix/bridgev2/status"
 	"maunium.net/go/mautrix/bridgev2"
 	"maunium.net/go/mautrix/bridgev2/networkid"
 )

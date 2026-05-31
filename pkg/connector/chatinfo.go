@@ -335,7 +335,7 @@ func (qc *QQClient) updateMemberDisplyname(ctx context.Context, portal *bridgev2
 	}
 	if members, err := sess.GetGroupMemberList(ctx, string(portal.ID)); err == nil {
 		for _, member := range members {
-			memberIntent := portal.GetIntentFor(ctx, qc.makeEventSender(member.UserID.String()), qc.UserLogin, bridgev2.RemoteEventChatInfoChange)
+			memberIntent, _ := portal.GetIntentFor(ctx, qc.makeEventSender(member.UserID.String()), qc.UserLogin, bridgev2.RemoteEventChatInfoChange)
 
 			mxid := memberIntent.GetMXID()
 
