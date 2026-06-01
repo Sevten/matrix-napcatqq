@@ -1,5 +1,5 @@
 # Matrix-NapCatQQ
-A matrix-napcatqq puppeting bridge based on [NapCatQQ](https://github.com/NapNeko/NapCatQQ) and [mautrix-go](https://github.com/mautrix/go).
+A matrix-QQ puppeting bridge based on [NapCatQQ](https://github.com/NapNeko/NapCatQQ) and [mautrix-go](https://github.com/mautrix/go).
 
 ## Setup & Usage
 
@@ -86,13 +86,13 @@ Multiple NapCatQQ instances can connect to the same bridge endpoint; events and 
 ### Features & roadmap
 
 * Matrix → QQ
-  * [ ] Message types
+  * [x] Message types
     * [x] Text
     * [x] Image
     * [x] Sticker
     * [x] Video
-    * [ ] Audio
-    * [ ] File
+    * [x] Audio
+    * [x] File
     * [x] Mention
     * [x] Reply
     * [x] Location
@@ -102,14 +102,14 @@ Multiple NapCatQQ instances can connect to the same bridge endpoint; events and 
   * [ ] Presence
   * [x] Redaction
   * [ ] Group actions
-    * [ ] Join
+    * [x] Join
     * [ ] Invite
-    * [ ] Leave
-    * [ ] Kick
+    * [x] Leave
+    * [x] Kick
     * [ ] Mute
   * [ ] Room metadata
-    * [ ] Name
-    * [ ] Avatar
+    * [x] Name
+    * [x] Avatar
     * [ ] Topic
   * [ ] User metadata
     * [ ] Name
@@ -121,7 +121,7 @@ Multiple NapCatQQ instances can connect to the same bridge endpoint; events and 
     * [x] Image
     * [ ] Sticker
     * [x] Video
-    * [ ] Audio
+    * [x] Audio
     * [x] File
     * [x] Mention
     * [x] Reply
@@ -137,7 +137,7 @@ Multiple NapCatQQ instances can connect to the same bridge endpoint; events and 
     * [x] Join
     * [x] Leave
     * [x] Kick
-    * [ ] Mute
+    * [x] Mute
   * [ ] Group metadata
     * [x] Name
     * [x] Avatar

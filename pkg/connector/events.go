@@ -93,3 +93,53 @@ func (evt *QQMessageEvent) ConvertMessage(ctx context.Context, portal *bridgev2.
 
 	return evt.qc.Main.MsgConv.ToMatrix(ctx, evt.qc.session(), portal, intent, evt.Message), nil
 }
+
+type QQNoticeEvent struct {
+	Message    *qqid.Message
+	NoticeType string
+	qc         *QQClient
+}
+
+var (
+	_ bridgev2.RemoteEventThatMayCreatePortal = (*QQNoticeEvent)(nil)
+	_ bridgev2.RemoteChatResyncWithInfo       = (*QQNoticeEvent)(nil)
+)
+
+func (evt *QQNoticeEvent) ShouldCreatePortal() bool {
+	return true
+}
+
+func (evt *QQNoticeEvent) AddLogContext(c zerolog.Context) zerolog.Context {
+	return c.Str("notice_type", evt.NoticeType).Str("message_id", evt.Message.ID)
+}
+
+func (evt *QQNoticeEvent) GetPortalKey() networkid.PortalKey {
+	return evt.qc.makePortalKey(evt.Message.ChatType, evt.Message.ChatID)
+}
+
+func (evt *QQNoticeEvent) GetSender() bridgev2.EventSender {
+	return evt.qc.makeEventSender(evt.Message.SenderID)
+}
+
+func (evt *QQNoticeEvent) GetID() networkid.MessageID {
+	return qqid.MakeFakeMessageID(evt.Message.ChatID, "notice-"+evt.Message.ID)
+}
+
+func (evt *QQNoticeEvent) GetTimestamp() time.Time {
+	return time.UnixMilli(evt.Message.Timestamp)
+}
+
+func (evt *QQNoticeEvent) GetType() bridgev2.RemoteEventType {
+	return bridgev2.RemoteEventUnknown
+}
+
+func (evt *QQNoticeEvent) GetChatInfo(ctx context.Context, portal *bridgev2.Portal) (*bridgev2.ChatInfo, error) {
+	switch evt.Message.ChatType {
+	case qqid.ChatPrivate:
+		return evt.qc.getDirectChatInfo(string(portal.ID))
+	case qqid.ChatGroup:
+		return evt.qc.getGroupChatInfo(ctx, portal)
+	default:
+		return nil, fmt.Errorf("chat type %v not supported", evt.Message.ChatType)
+	}
+}

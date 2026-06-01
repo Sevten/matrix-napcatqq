@@ -69,31 +69,55 @@ func (qc *QQClient) handleOneBotMessage(evt *onebot.Event) {
 }
 
 func (qc *QQClient) handleOneBotNotice(evt *onebot.Event) {
-	if evt.NoticeType != "friend_recall" && evt.NoticeType != "group_recall" {
+	if evt.NoticeType == "friend_recall" || evt.NoticeType == "group_recall" {
+		chatID, chatType := qc.chatFromEvent(evt)
+		senderID := evt.OperatorID.String()
+		if senderID == "" {
+			senderID = evt.UserID.String()
+		}
+		if senderID == "" {
+			senderID = string(qc.UserLogin.ID)
+		}
+
+		qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &QQMessageEvent{
+			Message: &qqid.Message{
+				ID:        evt.MessageID.String(),
+				Timestamp: eventTimestamp(evt),
+				Type:      qqid.MsgRevoke,
+				ChatID:    chatID,
+				ChatType:  chatType,
+				SenderID:  senderID,
+				Elements:  nil,
+			},
+			qc: qc,
+		})
 		return
 	}
 
-	chatID, chatType := qc.chatFromEvent(evt)
-	senderID := evt.OperatorID.String()
-	if senderID == "" {
-		senderID = evt.UserID.String()
-	}
-	if senderID == "" {
-		senderID = string(qc.UserLogin.ID)
-	}
+	if evt.NoticeType == "group_increase" || evt.NoticeType == "group_decrease" ||
+		evt.NoticeType == "group_admin" || evt.NoticeType == "group_ban" ||
+		evt.NoticeType == "group_upload" {
+		
+		chatID, chatType := qc.chatFromEvent(evt)
+		senderID := evt.UserID.String()
+		if senderID == "" {
+			senderID = string(qc.UserLogin.ID)
+		}
 
-	qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &QQMessageEvent{
-		Message: &qqid.Message{
-			ID:        evt.MessageID.String(),
-			Timestamp: eventTimestamp(evt),
-			Type:      qqid.MsgRevoke,
-			ChatID:    chatID,
-			ChatType:  chatType,
-			SenderID:  senderID,
-			Elements:  nil,
-		},
-		qc: qc,
-	})
+		qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &QQNoticeEvent{
+			Message: &qqid.Message{
+				ID:        fmt.Sprintf("%d", evt.Time),
+				Timestamp: eventTimestamp(evt),
+				Type:      qqid.MsgNotice,
+				ChatID:    chatID,
+				ChatType:  chatType,
+				SenderID:  senderID,
+				Elements:  nil,
+			},
+			NoticeType: evt.NoticeType,
+			qc:         qc,
+		})
+	}
 }
 
 func (qc *QQClient) chatFromEvent(evt *onebot.Event) (string, qqid.ChatType) {

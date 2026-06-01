@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -9,9 +10,13 @@ import (
 	"github.com/sevten/matrix-napcatqq/pkg/qqid"
 	"maunium.net/go/mautrix/bridgev2"
 	"maunium.net/go/mautrix/bridgev2/database"
+	"maunium.net/go/mautrix/event"
 )
 
 var _ bridgev2.RedactionHandlingNetworkAPI = (*QQClient)(nil)
+var _ bridgev2.RoomNameHandlingNetworkAPI = (*QQClient)(nil)
+var _ bridgev2.RoomAvatarHandlingNetworkAPI = (*QQClient)(nil)
+var _ bridgev2.MembershipHandlingNetworkAPI = (*QQClient)(nil)
 
 func (qc *QQClient) HandleMatrixMessage(ctx context.Context, msg *bridgev2.MatrixMessage) (*bridgev2.MatrixMessageResponse, error) {
 	sess := qc.session()
@@ -75,3 +80,84 @@ func (qc *QQClient) HandleMatrixMessageRemove(ctx context.Context, msg *bridgev2
 	}
 	return sess.DeleteMessage(ctx, parsed.ID)
 }
+
+func (qc *QQClient) HandleMatrixRoomName(ctx context.Context, msg *bridgev2.MatrixRoomName) (bool, error) {
+	sess := qc.session()
+	if sess == nil {
+		return false, bridgev2.ErrNotLoggedIn
+	}
+	target := string(msg.Portal.ID)
+	meta := msg.Portal.Metadata.(*qqid.PortalMetadata)
+	if meta.ChatType != qqid.ChatGroup {
+		return false, nil
+	}
+	err := sess.SetGroupName(ctx, target, msg.Content.Name)
+	if err != nil {
+		return false, fmt.Errorf("failed to set group name: %w", err)
+	}
+	return true, nil
+}
+
+func (qc *QQClient) HandleMatrixRoomAvatar(ctx context.Context, msg *bridgev2.MatrixRoomAvatar) (bool, error) {
+	sess := qc.session()
+	if sess == nil {
+		return false, bridgev2.ErrNotLoggedIn
+	}
+	target := string(msg.Portal.ID)
+	meta := msg.Portal.Metadata.(*qqid.PortalMetadata)
+	if meta.ChatType != qqid.ChatGroup {
+		return false, nil
+	}
+	data, err := qc.Main.Bridge.Bot.DownloadMedia(ctx, msg.Content.URL, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to download avatar: %w", err)
+	}
+	file := "base64://" + base64.StdEncoding.EncodeToString(data)
+	err = sess.SetGroupPortrait(ctx, target, file)
+	if err != nil {
+		return false, fmt.Errorf("failed to set group avatar: %w", err)
+	}
+	return true, nil
+}
+
+func (qc *QQClient) HandleMatrixMembership(ctx context.Context, msg *bridgev2.MatrixMembershipChange) (*bridgev2.MatrixMembershipResult, error) {
+	sess := qc.session()
+	if sess == nil {
+		return nil, bridgev2.ErrNotLoggedIn
+	}
+	target := string(msg.Portal.ID)
+	meta := msg.Portal.Metadata.(*qqid.PortalMetadata)
+	if meta.ChatType != qqid.ChatGroup {
+		return nil, nil
+	}
+
+	var targetUserID string
+	if msg.Target != nil {
+		if ghost, ok := msg.Target.(*bridgev2.Ghost); ok {
+			targetUserID = string(ghost.ID)
+		} else if user, ok := msg.Target.(*bridgev2.UserLogin); ok {
+			targetUserID = string(user.ID)
+		}
+	}
+
+	if msg.Type.To == event.MembershipLeave {
+		if msg.Type.IsSelf {
+			err := sess.SetGroupLeave(ctx, target, false)
+			if err != nil {
+				return nil, fmt.Errorf("failed to leave group: %w", err)
+			}
+		} else if targetUserID != "" {
+			err := sess.SetGroupKick(ctx, target, targetUserID, false)
+			if err != nil {
+				return nil, fmt.Errorf("failed to kick user: %w", err)
+			}
+		}
+	} else if msg.Type.To == event.MembershipBan && targetUserID != "" {
+		err := sess.SetGroupKick(ctx, target, targetUserID, true)
+		if err != nil {
+			return nil, fmt.Errorf("failed to ban user: %w", err)
+		}
+	}
+	return nil, nil
+}
+

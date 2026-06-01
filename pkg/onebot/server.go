@@ -384,3 +384,40 @@ func (s *Session) GetFile(ctx context.Context, fileID string) (*FileResponse, er
 	err := s.Call(ctx, "get_file", map[string]any{"file_id": fileID}, &resp)
 	return &resp, err
 }
+
+func (s *Session) SetGroupName(ctx context.Context, groupID string, groupName string) error {
+	return s.Call(ctx, "set_group_name", map[string]any{
+		"group_id":   groupID,
+		"group_name": groupName,
+	}, nil)
+}
+
+func (s *Session) SetGroupPortrait(ctx context.Context, groupID string, file string) error {
+	return s.Call(ctx, "set_group_portrait", map[string]any{
+		"group_id": groupID,
+		"file":     file,
+	}, nil)
+}
+
+func (s *Session) SetGroupKick(ctx context.Context, groupID string, userID string, rejectAddRequest bool) error {
+	return s.Call(ctx, "set_group_kick", map[string]any{
+		"group_id":           groupID,
+		"user_id":            userID,
+		"reject_add_request": rejectAddRequest,
+	}, nil)
+}
+
+func (s *Session) SetGroupLeave(ctx context.Context, groupID string, isDismiss bool) error {
+	return s.Call(ctx, "set_group_leave", map[string]any{
+		"group_id":   groupID,
+		"is_dismiss": isDismiss,
+	}, nil)
+}
+
+func (s *Session) SetGroupBan(ctx context.Context, groupID string, userID string, duration int) error {
+	return s.Call(ctx, "set_group_ban", map[string]any{
+		"group_id": groupID,
+		"user_id":  userID,
+		"duration": duration, // in seconds, 0 to unban
+	}, nil)
+}

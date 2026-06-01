@@ -29,6 +29,7 @@ const (
 	MsgLocation MessageType = "location"
 	MsgApp      MessageType = "app"
 	MsgRevoke   MessageType = "revoke"
+	MsgNotice   MessageType = "notice"
 )
 
 type Message struct {
