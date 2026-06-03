@@ -12,4 +12,8 @@
 
 vendor/
 
+.gocache/
+.gomodcache/
+.gotmp/
+
 /matrix-napcatqq

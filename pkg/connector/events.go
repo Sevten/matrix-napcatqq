@@ -103,6 +103,7 @@ type QQNoticeEvent struct {
 var (
 	_ bridgev2.RemoteEventThatMayCreatePortal = (*QQNoticeEvent)(nil)
 	_ bridgev2.RemoteChatResyncWithInfo       = (*QQNoticeEvent)(nil)
+	_ bridgev2.RemoteMessage                  = (*QQNoticeEvent)(nil)
 )
 
 func (evt *QQNoticeEvent) ShouldCreatePortal() bool {
@@ -130,7 +131,7 @@ func (evt *QQNoticeEvent) GetTimestamp() time.Time {
 }
 
 func (evt *QQNoticeEvent) GetType() bridgev2.RemoteEventType {
-	return bridgev2.RemoteEventUnknown
+	return bridgev2.RemoteEventMessage
 }
 
 func (evt *QQNoticeEvent) GetChatInfo(ctx context.Context, portal *bridgev2.Portal) (*bridgev2.ChatInfo, error) {
@@ -142,4 +143,8 @@ func (evt *QQNoticeEvent) GetChatInfo(ctx context.Context, portal *bridgev2.Port
 	default:
 		return nil, fmt.Errorf("chat type %v not supported", evt.Message.ChatType)
 	}
+}
+
+func (evt *QQNoticeEvent) ConvertMessage(ctx context.Context, portal *bridgev2.Portal, intent bridgev2.MatrixAPI) (*bridgev2.ConvertedMessage, error) {
+	return evt.qc.Main.MsgConv.ToMatrix(ctx, evt.qc.session(), portal, intent, evt.Message), nil
 }

@@ -77,6 +77,7 @@ func (qc *QQClient) startLoops() {
 	}
 
 	go qc.ghostResyncLoop(ctx)
+	go qc.syncRecentContacts(ctx)
 }
 
 func (qc *QQClient) session() *onebot.Session {

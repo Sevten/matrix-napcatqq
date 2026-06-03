@@ -7,7 +7,6 @@ This project is building upon [duo/matrix-qq](https://github.com/duo/matrix-qq) 
 
 ### This Project's Architecture
 
-**This Project's Architecture:**
 ```
 Matrix ←→ mautrix bridgev2 ←→ OneBot v11 Reverse WebSocket ←→ NapCatQQ ←→ QQ Servers
 ```
@@ -98,6 +97,8 @@ Multiple NapCatQQ instances can connect to the same bridge endpoint; events and 
 
 ### Features & roadmap
 
+NapCatQQ reverse WebSocket binding is the only supported login method in this fork. Password and QR-code login are intentionally out of scope because the QQ protocol session is owned by NapCatQQ.
+
 * Matrix → QQ
   * [x] Message types
     * [x] Text
@@ -110,40 +111,50 @@ Multiple NapCatQQ instances can connect to the same bridge endpoint; events and 
     * [x] Reply
     * [x] Location
   * [x] Chat types
-	  * [x] Direct
-	  * [x] Room
-  * [ ] Presence
+    * [x] Direct
+    * [x] Room
+  * [x] Presence
   * [x] Redaction
   * [ ] Group actions
     * [x] Join
     * [ ] Invite
     * [x] Leave
     * [x] Kick
-    * [ ] Mute
+    * [x] Mute
+    * [x] Admin
   * [ ] Room metadata
     * [x] Name
     * [x] Avatar
-    * [ ] Topic
+    * [x] Topic
   * [ ] User metadata
     * [ ] Name
     * [ ] Avatar
+  * [x] Backfill / history sync
+  * [x] Read receipts
+  * [x] Reactions
+  * [x] Typing
+  * [ ] Friend/group requests
 
 * QQ → Matrix
   * [ ] Message types
     * [x] Text
     * [x] Image
-    * [ ] Sticker
+    * [x] Sticker
     * [x] Video
     * [x] Audio
     * [x] File
     * [x] Mention
     * [x] Reply
     * [x] Location
+    * [x] Forwarded messages
+    * [x] Special segments
+    * [x] Notice events
   * [ ] Chat types
     * [x] Private
     * [x] Group
     * [ ] Stranger (unidirectional)
   * [ ] Presence
+    * [x] Typing
   * [x] Redaction
   * [ ] Group actions
     * [ ] Invite
@@ -159,12 +170,16 @@ Multiple NapCatQQ instances can connect to the same bridge endpoint; events and 
     * [x] Name
     * [x] Avatar
   * [ ] Login types
-	  * [ ] Password
-	  * [x] NapCatQQ reverse WebSocket binding
+    * [ ] Password
+    * [x] NapCatQQ reverse WebSocket binding
+  * [x] Recent contact sync
+  * [x] Group emoji likes
+  * [ ] Friend/group requests
 
 * Misc
   * [ ] Automatic portal creation
     * [ ] After login
     * [ ] When added to group
     * [x] When receiving message
+    * [x] From recent contacts
   * [x] Double puppeting

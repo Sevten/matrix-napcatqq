@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/antchfx/xmlquery"
-	"github.com/sevten/matrix-napcatqq/pkg/onebot"
-	"github.com/sevten/matrix-napcatqq/pkg/qqid"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/rs/zerolog"
+	"github.com/sevten/matrix-napcatqq/pkg/onebot"
+	"github.com/sevten/matrix-napcatqq/pkg/qqid"
 	"github.com/tidwall/gjson"
 	"maunium.net/go/mautrix/bridgev2"
 	"maunium.net/go/mautrix/bridgev2/networkid"
@@ -40,30 +40,31 @@ func (mc *MessageConverter) ToMatrix(
 	ctx = context.WithValue(ctx, contextKeyIntent, intent)
 	ctx = context.WithValue(ctx, contextKeyPortal, portal)
 
-	var part *bridgev2.ConvertedMessagePart
+	var parts []*bridgev2.ConvertedMessagePart
 	switch msg.Type {
 	case qqid.MsgImage:
-		part = mc.convertImageMessage(ctx, msg)
+		parts = []*bridgev2.ConvertedMessagePart{mc.convertImageMessage(ctx, msg)}
 	case qqid.MsgAudio, qqid.MsgVideo, qqid.MsgFile:
-		parts := mc.convertMediaMessage(ctx, msg)
-		if len(parts) > 0 {
-			part = parts[0]
-		}
+		parts = mc.convertMediaMessage(ctx, msg)
 	case qqid.MsgApp:
-		part = mc.convertAppMessage(ctx, msg)
+		parts = mc.convertAppMessage(ctx, msg)
+	case qqid.MsgSticker:
+		parts = []*bridgev2.ConvertedMessagePart{mc.convertTextMessage(msg)}
 	case qqid.MsgRevoke:
-		part = mc.convertRevokeMessage(ctx, msg)
+		parts = []*bridgev2.ConvertedMessagePart{mc.convertRevokeMessage(ctx, msg)}
 	case qqid.MsgLocation:
-		part = mc.convertOneBotLocationMessage(msg)
+		parts = []*bridgev2.ConvertedMessagePart{mc.convertOneBotLocationMessage(msg)}
 	}
-	if part == nil {
-		part = mc.convertTextMessage(msg)
+	if len(parts) == 0 {
+		parts = []*bridgev2.ConvertedMessagePart{mc.convertTextMessage(msg)}
 	}
 
-	part.Content.Mentions = &event.Mentions{}
-	mc.addMentions(ctx, msg.Elements, part.Content)
+	for _, part := range parts {
+		part.Content.Mentions = &event.Mentions{}
+		mc.addMentions(ctx, msg.Elements, part.Content)
+	}
 
-	cm := &bridgev2.ConvertedMessage{Parts: []*bridgev2.ConvertedMessagePart{part}}
+	cm := &bridgev2.ConvertedMessage{Parts: parts}
 	if msg.Type == qqid.MsgRevoke {
 		cm.ReplyTo = &networkid.MessageOptionalPartID{MessageID: qqid.MakeMessageID(msg.ChatID, msg.ID)}
 	} else if replyID := findReplyID(msg.Elements); replyID != "" {
@@ -111,7 +112,7 @@ func (mc *MessageConverter) convertImageMessage(ctx context.Context, msg *qqid.M
 func (mc *MessageConverter) convertMediaMessage(ctx context.Context, msg *qqid.Message) []*bridgev2.ConvertedMessagePart {
 	parts := make([]*bridgev2.ConvertedMessagePart, 0)
 	for _, elem := range msg.Elements {
-		if elem.Type == "image" || elem.Type == "record" || elem.Type == "video" || elem.Type == "file" {
+		if elem.Type == "image" || elem.Type == "mface" || elem.Type == "record" || elem.Type == "video" || elem.Type == "file" {
 			if part, err := mc.reuploadAttachment(ctx, elem); err != nil {
 				parts = append(parts, mc.makeMediaFailure(ctx, err))
 			} else {
@@ -122,11 +123,17 @@ func (mc *MessageConverter) convertMediaMessage(ctx context.Context, msg *qqid.M
 	return parts
 }
 
-func (mc *MessageConverter) convertAppMessage(_ context.Context, msg *qqid.Message) *bridgev2.ConvertedMessagePart {
+func (mc *MessageConverter) convertAppMessage(ctx context.Context, msg *qqid.Message) []*bridgev2.ConvertedMessagePart {
 	if len(msg.Elements) == 0 {
-		return mc.convertTextMessage(msg)
+		return []*bridgev2.ConvertedMessagePart{mc.convertTextMessage(msg)}
 	}
 	elem := msg.Elements[0]
+	if elem.Type == "forward" {
+		return mc.convertForwardMessage(ctx, msg, elem)
+	}
+	if elem.Type == "dice" || elem.Type == "rps" || elem.Type == "poke" || elem.Type == "shake" || elem.Type == "node" {
+		return []*bridgev2.ConvertedMessagePart{mc.convertTextMessage(msg)}
+	}
 	content := stringValue(elem.Data, "data")
 	if content == "" {
 		content = stringValue(elem.Data, "content")
@@ -144,10 +151,10 @@ func (mc *MessageConverter) convertAppMessage(_ context.Context, msg *qqid.Messa
 		if summary.Len() > 0 {
 			body = summary.String()
 		}
-		return &bridgev2.ConvertedMessagePart{
+		return []*bridgev2.ConvertedMessagePart{{
 			Type:    event.EventMessage,
 			Content: &event.MessageEventContent{Body: body, MsgType: event.MsgText},
-		}
+		}}
 	}
 	if elem.Type == "json" {
 		view := gjson.Get(content, "view").String()
@@ -156,10 +163,40 @@ func (mc *MessageConverter) convertAppMessage(_ context.Context, msg *qqid.Messa
 			address := gjson.Get(content, "meta.*.address").String()
 			latitude := gjson.Get(content, "meta.*.lat").Float()
 			longitude := gjson.Get(content, "meta.*.lng").Float()
-			return mc.convertLocationMessage(name, address, latitude, longitude)
+			return []*bridgev2.ConvertedMessagePart{mc.convertLocationMessage(name, address, latitude, longitude)}
 		}
 	}
-	return mc.convertTextMessage(msg)
+	return []*bridgev2.ConvertedMessagePart{mc.convertTextMessage(msg)}
+}
+
+func (mc *MessageConverter) convertForwardMessage(ctx context.Context, msg *qqid.Message, elem onebot.Segment) []*bridgev2.ConvertedMessagePart {
+	forwardID := stringValue(elem.Data, "id")
+	if forwardID == "" {
+		forwardID = stringValue(elem.Data, "file")
+	}
+	if forwardID == "" {
+		return []*bridgev2.ConvertedMessagePart{mc.convertTextMessage(msg)}
+	}
+	resp, err := getSession(ctx).GetForwardMessage(ctx, forwardID)
+	if err != nil || resp == nil || len(resp.Messages) == 0 {
+		return []*bridgev2.ConvertedMessagePart{mc.convertTextMessage(msg)}
+	}
+	parts := make([]*bridgev2.ConvertedMessagePart, 0, len(resp.Messages))
+	for _, node := range resp.Messages {
+		sender := firstNonEmpty(node.Nickname, node.Sender.Card, node.Sender.Nickname, node.UserID.String())
+		body := toContent(node.Elements())
+		if sender != "" {
+			body = fmt.Sprintf("%s: %s", sender, body)
+		}
+		parts = append(parts, &bridgev2.ConvertedMessagePart{
+			Type: event.EventMessage,
+			Content: &event.MessageEventContent{
+				MsgType: event.MsgText,
+				Body:    body,
+			},
+		})
+	}
+	return parts
 }
 
 func (mc *MessageConverter) convertOneBotLocationMessage(msg *qqid.Message) *bridgev2.ConvertedMessagePart {
@@ -242,7 +279,7 @@ func (mc *MessageConverter) reuploadAttachment(ctx context.Context, elem onebot.
 	mime := mimetype.Detect(data)
 	content := &event.MessageEventContent{Info: &event.FileInfo{}}
 	switch elem.Type {
-	case "image":
+	case "image", "mface":
 		content.MsgType = event.MsgImage
 	case "record":
 		content.MsgType = event.MsgAudio
@@ -342,6 +379,31 @@ func toContent(elems []onebot.Segment) string {
 			fmt.Fprintf(&content, "[Forward: %s]", stringValue(elem.Data, "id"))
 		case "face":
 			fmt.Fprintf(&content, "/[Face%s]", stringValue(elem.Data, "id"))
+		case "mface":
+			summary := firstNonEmpty(
+				stringValue(elem.Data, "summary"),
+				stringValue(elem.Data, "emoji_package_id"),
+				stringValue(elem.Data, "key"),
+				"MFace",
+			)
+			fmt.Fprintf(&content, "[%s]", summary)
+		case "dice":
+			result := firstNonEmpty(stringValue(elem.Data, "result"), stringValue(elem.Data, "id"), "?")
+			fmt.Fprintf(&content, "[Dice: %s]", result)
+		case "rps":
+			result := firstNonEmpty(stringValue(elem.Data, "result"), stringValue(elem.Data, "id"), "?")
+			fmt.Fprintf(&content, "[Rock-paper-scissors: %s]", result)
+		case "poke":
+			target := firstNonEmpty(stringValue(elem.Data, "qq"), stringValue(elem.Data, "user_id"))
+			if target == "" {
+				fmt.Fprintf(&content, "[Poke]")
+			} else {
+				fmt.Fprintf(&content, "[Poke: %s]", target)
+			}
+		case "shake":
+			fmt.Fprintf(&content, "[Window shake]")
+		case "node":
+			fmt.Fprintf(&content, "[Forward node]")
 		case "image":
 			fmt.Fprintf(&content, "[Image]")
 		case "record":
@@ -359,10 +421,23 @@ func toContent(elems []onebot.Segment) string {
 	return content.String()
 }
 
+func ToPlainText(elems []onebot.Segment) string {
+	return toContent(elems)
+}
+
 func findReplyID(elems []onebot.Segment) string {
 	for _, elem := range elems {
 		if elem.Type == "reply" {
 			return stringValue(elem.Data, "id")
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, val := range values {
+		if val != "" {
+			return val
 		}
 	}
 	return ""

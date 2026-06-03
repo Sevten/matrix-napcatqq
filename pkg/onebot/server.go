@@ -385,6 +385,73 @@ func (s *Session) GetFile(ctx context.Context, fileID string) (*FileResponse, er
 	return &resp, err
 }
 
+func (s *Session) GetMessage(ctx context.Context, messageID string) (*MessageDetail, error) {
+	var resp MessageDetail
+	err := s.Call(ctx, "get_msg", map[string]any{"message_id": messageID}, &resp)
+	return &resp, err
+}
+
+func (s *Session) GetForwardMessage(ctx context.Context, messageID string) (*ForwardMessageResponse, error) {
+	var resp ForwardMessageResponse
+	err := s.Call(ctx, "get_forward_msg", map[string]any{"message_id": messageID}, &resp)
+	return &resp, err
+}
+
+func (s *Session) GetRecentContacts(ctx context.Context, count int) ([]RecentContact, error) {
+	var resp []RecentContact
+	err := s.Call(ctx, "get_recent_contact", map[string]any{"count": count}, &resp)
+	return resp, err
+}
+
+func (s *Session) GetFriendMessageHistory(ctx context.Context, userID string, messageSeq string, count int, reverseOrder bool) (*MessageHistoryResponse, error) {
+	params := map[string]any{
+		"user_id":       userID,
+		"count":         count,
+		"reverseOrder":  reverseOrder,
+		"reverse_order": reverseOrder,
+	}
+	if messageSeq != "" {
+		params["message_seq"] = messageSeq
+	}
+	var resp MessageHistoryResponse
+	err := s.Call(ctx, "get_friend_msg_history", params, &resp)
+	return &resp, err
+}
+
+func (s *Session) GetGroupMessageHistory(ctx context.Context, groupID string, messageSeq string, count int, reverseOrder bool) (*MessageHistoryResponse, error) {
+	params := map[string]any{
+		"group_id":      groupID,
+		"count":         count,
+		"reverseOrder":  reverseOrder,
+		"reverse_order": reverseOrder,
+	}
+	if messageSeq != "" {
+		params["message_seq"] = messageSeq
+	}
+	var resp MessageHistoryResponse
+	err := s.Call(ctx, "get_group_msg_history", params, &resp)
+	return &resp, err
+}
+
+func (s *Session) MarkMessageAsRead(ctx context.Context, messageID string) error {
+	return s.Call(ctx, "mark_msg_as_read", map[string]any{"message_id": messageID}, nil)
+}
+
+func (s *Session) MarkPrivateMessageAsRead(ctx context.Context, userID string) error {
+	return s.Call(ctx, "mark_private_msg_as_read", map[string]any{"user_id": userID}, nil)
+}
+
+func (s *Session) MarkGroupMessageAsRead(ctx context.Context, groupID string) error {
+	return s.Call(ctx, "mark_group_msg_as_read", map[string]any{"group_id": groupID}, nil)
+}
+
+func (s *Session) SetInputStatus(ctx context.Context, userID string, eventType int) error {
+	return s.Call(ctx, "set_input_status", map[string]any{
+		"user_id":    userID,
+		"event_type": eventType,
+	}, nil)
+}
+
 func (s *Session) SetGroupName(ctx context.Context, groupID string, groupName string) error {
 	return s.Call(ctx, "set_group_name", map[string]any{
 		"group_id":   groupID,
@@ -419,5 +486,52 @@ func (s *Session) SetGroupBan(ctx context.Context, groupID string, userID string
 		"group_id": groupID,
 		"user_id":  userID,
 		"duration": duration, // in seconds, 0 to unban
+	}, nil)
+}
+
+func (s *Session) SetGroupWholeBan(ctx context.Context, groupID string, enable bool) error {
+	return s.Call(ctx, "set_group_whole_ban", map[string]any{
+		"group_id": groupID,
+		"enable":   enable,
+	}, nil)
+}
+
+func (s *Session) SetGroupAdmin(ctx context.Context, groupID string, userID string, enable bool) error {
+	return s.Call(ctx, "set_group_admin", map[string]any{
+		"group_id": groupID,
+		"user_id":  userID,
+		"enable":   enable,
+	}, nil)
+}
+
+func (s *Session) SendGroupNotice(ctx context.Context, groupID string, content string) error {
+	return s.Call(ctx, "_send_group_notice", map[string]any{
+		"group_id": groupID,
+		"content":  content,
+	}, nil)
+}
+
+func (s *Session) SetMessageEmojiLike(ctx context.Context, messageID string, emojiID string, set bool) error {
+	return s.Call(ctx, "set_msg_emoji_like", map[string]any{
+		"message_id": messageID,
+		"emoji_id":   emojiID,
+		"set":        set,
+	}, nil)
+}
+
+func (s *Session) SetFriendAddRequest(ctx context.Context, flag string, approve bool, remark string) error {
+	return s.Call(ctx, "set_friend_add_request", map[string]any{
+		"flag":    flag,
+		"approve": approve,
+		"remark":  remark,
+	}, nil)
+}
+
+func (s *Session) SetGroupAddRequest(ctx context.Context, flag string, subType string, approve bool, reason string) error {
+	return s.Call(ctx, "set_group_add_request", map[string]any{
+		"flag":     flag,
+		"sub_type": subType,
+		"approve":  approve,
+		"reason":   reason,
 	}, nil)
 }

@@ -46,7 +46,7 @@ type Message struct {
 func ParseMessageType(elems []onebot.Segment) MessageType {
 	for _, elem := range elems {
 		switch elem.Type {
-		case "image":
+		case "image", "mface":
 			return MsgImage
 		case "record":
 			return MsgAudio
@@ -54,10 +54,12 @@ func ParseMessageType(elems []onebot.Segment) MessageType {
 			return MsgVideo
 		case "file":
 			return MsgFile
-		case "json", "xml", "forward":
+		case "json", "xml", "forward", "node", "dice", "rps", "poke", "shake":
 			return MsgApp
 		case "location":
 			return MsgLocation
+		case "face":
+			return MsgSticker
 		}
 	}
 
