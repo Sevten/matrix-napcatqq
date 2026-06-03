@@ -5,12 +5,7 @@ A matrix-QQ puppeting bridge based on [NapCatQQ](https://github.com/NapNeko/NapC
 
 This project is building upon [duo/matrix-qq](https://github.com/duo/matrix-qq) and replace the underlying QQ protocol implementation with [NapCatQQ](https://github.com/NapNeko/NapCatQQ).
 
-### Key Architectural Changes
-
-**Upstream duo/matrix-qq Architecture:**
-```
-Matrix ←→ mautrix bridgev2 ←→ lagrange-go (Native QQ Protocol) ←→ QQ Servers
-```
+### This Project's Architecture
 
 **This Project's Architecture:**
 ```
@@ -18,12 +13,6 @@ Matrix ←→ mautrix bridgev2 ←→ OneBot v11 Reverse WebSocket ←→ NapCat
 ```
 
 This project no longer features a built-in QQ protocol implementation. Instead, it operates as a **OneBot v11 Reverse WebSocket server**. External NapCatQQ processes connect actively to this service, which then bridges the messages to Matrix.
-
-### Main Feature Differences
-
-* **Authentication Method**: Password/QR code login is no longer supported. Accounts are now bound via the reverse WebSocket connection from NapCatQQ.
-* **Multi-Account Support**: Multiple NapCatQQ instances can connect to the same bridge service simultaneously, with messages automatically routed based on `self_id`.
-* **Zero Protocol Maintenance Burden**: QQ protocol compatibility is maintained entirely by NapCatQQ, allowing this project to focus solely on integrating with the standard OneBot v11 API.
 
 ## Setup & Usage
 
