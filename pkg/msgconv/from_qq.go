@@ -43,7 +43,7 @@ func (mc *MessageConverter) ToMatrix(
 	var parts []*bridgev2.ConvertedMessagePart
 	switch msg.Type {
 	case qqid.MsgImage:
-		parts = []*bridgev2.ConvertedMessagePart{mc.convertImageMessage(ctx, msg)}
+		parts = mc.convertImageMessage(ctx, msg)
 	case qqid.MsgAudio, qqid.MsgVideo, qqid.MsgFile:
 		parts = mc.convertMediaMessage(ctx, msg)
 	case qqid.MsgApp:
@@ -83,13 +83,28 @@ func (mc *MessageConverter) convertTextMessage(msg *qqid.Message) *bridgev2.Conv
 	}
 }
 
-func (mc *MessageConverter) convertImageMessage(ctx context.Context, msg *qqid.Message) *bridgev2.ConvertedMessagePart {
+func (mc *MessageConverter) convertImageMessage(ctx context.Context, msg *qqid.Message) []*bridgev2.ConvertedMessagePart {
 	parts := mc.convertMediaMessage(ctx, msg)
-	if len(parts) == 1 {
-		return parts[0]
-	}
 	if len(parts) == 0 {
-		return mc.convertTextMessage(msg)
+		return []*bridgev2.ConvertedMessagePart{mc.convertTextMessage(msg)}
+	}
+
+	if len(parts) == 1 {
+		var textContent strings.Builder
+		hasText := false
+		for _, elem := range msg.Elements {
+			if elem.Type != "image" && elem.Type != "mface" && elem.Type != "record" && elem.Type != "video" && elem.Type != "file" {
+				textContent.WriteString(toContent([]onebot.Segment{elem}))
+				hasText = true
+			}
+		}
+		text := strings.TrimSpace(textContent.String())
+		if hasText && text != "" {
+			textPart := mc.convertTextMessage(msg)
+			textPart.Content.Body = text
+			parts = append(parts, textPart)
+		}
+		return parts
 	}
 
 	var imagesMarkdown strings.Builder
@@ -98,7 +113,7 @@ func (mc *MessageConverter) convertImageMessage(ctx context.Context, msg *qqid.M
 	}
 	rendered := format.RenderMarkdown(imagesMarkdown.String(), true, false)
 	content := toContent(msg.Elements)
-	return &bridgev2.ConvertedMessagePart{
+	return []*bridgev2.ConvertedMessagePart{{
 		Type: event.EventMessage,
 		Content: &event.MessageEventContent{
 			MsgType:       event.MsgText,
@@ -106,7 +121,7 @@ func (mc *MessageConverter) convertImageMessage(ctx context.Context, msg *qqid.M
 			Body:          content,
 			FormattedBody: fmt.Sprintf("%s\n%s", rendered.FormattedBody, content),
 		},
-	}
+	}}
 }
 
 func (mc *MessageConverter) convertMediaMessage(ctx context.Context, msg *qqid.Message) []*bridgev2.ConvertedMessagePart {
