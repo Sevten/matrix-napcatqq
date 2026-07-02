@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/sevten/matrix-napcatqq/pkg/onebot"
@@ -273,6 +275,32 @@ func (qc *QQClient) HandleMatrixMembership(ctx context.Context, msg *bridgev2.Ma
 	target := string(msg.Portal.ID)
 	meta := msg.Portal.Metadata.(*qqid.PortalMetadata)
 	if meta.ChatType != qqid.ChatGroup {
+		if msg.Type == bridgev2.ProfileChange {
+			if _, isUser := msg.Target.(*bridgev2.UserLogin); isUser {
+				if msg.Content.Displayname != "" {
+					err := sess.SetQQProfile(ctx, msg.Content.Displayname, "", "")
+					if err != nil {
+						qc.Main.Bridge.Log.Err(err).Msg("Failed to update QQ profile nickname")
+					}
+				}
+				if msg.Content.AvatarURL != "" {
+					data, err := qc.Main.Bridge.Bot.DownloadMedia(ctx, msg.Content.AvatarURL, nil)
+					if err == nil {
+						tmpDir := os.TempDir()
+						tmpFile := filepath.Join(tmpDir, fmt.Sprintf("qq_avatar_%s", qc.UserLogin.ID))
+						err = os.WriteFile(tmpFile, data, 0644)
+						if err == nil {
+							err = sess.SetQQAvatar(ctx, "file://"+tmpFile)
+							if err != nil {
+								qc.Main.Bridge.Log.Err(err).Msg("Failed to update QQ profile avatar")
+							}
+						}
+					} else {
+						qc.Main.Bridge.Log.Err(err).Msg("Failed to download avatar from Matrix to update QQ")
+					}
+				}
+			}
+		}
 		return nil, nil
 	}
 

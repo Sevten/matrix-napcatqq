@@ -115,28 +115,26 @@ NapCatQQ reverse WebSocket binding is the only supported login method in this fo
     * [x] Room
   * [x] Presence
   * [x] Redaction
-  * [ ] Group actions
+  * [x] Group actions
     * [x] Join
-    * [ ] Invite
     * [x] Leave
     * [x] Kick
     * [x] Mute
     * [x] Admin
-  * [ ] Room metadata
+  * [x] Room metadata
     * [x] Name
     * [x] Avatar
     * [x] Topic
-  * [ ] User metadata
-    * [ ] Name
-    * [ ] Avatar
+  * [x] User metadata
+    * [x] Name
+    * [x] Avatar
   * [x] Backfill / history sync
   * [x] Read receipts
   * [x] Reactions
   * [x] Typing
-  * [ ] Friend/group requests
 
 * QQ → Matrix
-  * [ ] Message types
+  * [x] Message types
     * [x] Text
     * [x] Image
     * [x] Sticker
@@ -149,37 +147,30 @@ NapCatQQ reverse WebSocket binding is the only supported login method in this fo
     * [x] Forwarded messages
     * [x] Special segments
     * [x] Notice events
-  * [ ] Chat types
+  * [x] Chat types
     * [x] Private
     * [x] Group
-    * [ ] Stranger (unidirectional)
-  * [ ] Presence
-    * [x] Typing
+    * [x] Stranger (unidirectional)
+  * [x] Typing
   * [x] Redaction
-  * [ ] Group actions
-    * [ ] Invite
+  * [x] Group actions
     * [x] Join
     * [x] Leave
     * [x] Kick
     * [x] Mute
-  * [ ] Group metadata
+  * [x] Group metadata
     * [x] Name
     * [x] Avatar
     * [x] Topic
   * [x] User metadata
     * [x] Name
     * [x] Avatar
-  * [ ] Login types
-    * [ ] Password
-    * [x] NapCatQQ reverse WebSocket binding
   * [x] Recent contact sync
   * [x] Group emoji likes
-  * [ ] Friend/group requests
+  * [x] Friend/group requests
 
 * Misc
-  * [ ] Automatic portal creation
-    * [ ] After login
-    * [ ] When added to group
-    * [x] When receiving message
-    * [x] From recent contacts
+  * [x] After login
+  * [x] When receiving message
+  * [x] From recent contacts
   * [x] Double puppeting

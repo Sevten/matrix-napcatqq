@@ -174,6 +174,13 @@ type StrangerInfo struct {
 	Nickname string `json:"nickname"`
 }
 
+type FriendInfo struct {
+	UserID   ID     `json:"user_id"`
+	Nickname string `json:"nickname"`
+	Remark   string `json:"remark"`
+}
+
+
 type EventFile struct {
 	ID    ID     `json:"id"`
 	Name  string `json:"name"`

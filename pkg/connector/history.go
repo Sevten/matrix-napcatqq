@@ -20,36 +20,82 @@ const DefaultHistoryBackfillLimit = 50
 
 var _ bridgev2.BackfillingNetworkAPI = (*QQClient)(nil)
 
-func (qc *QQClient) syncRecentContacts(ctx context.Context) {
+func (qc *QQClient) syncAllContacts(ctx context.Context) {
 	sess := qc.session()
 	if sess == nil {
 		return
 	}
+	
+	// Sync recent contacts (gets latest messages)
 	contacts, err := sess.GetRecentContacts(ctx, DefaultHistoryBackfillLimit)
 	if err != nil {
 		qc.UserLogin.Log.Warn().Err(err).Msg("Failed to fetch recent QQ contacts")
-		return
-	}
-	for _, contact := range contacts {
-		chatID, chatType := contactToChat(contact)
-		if chatID == "" || chatType == qqid.ChatUnknown {
-			continue
-		}
-		latestTS := contactLatestTime(contact)
-		qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &simplevent.ChatResync{
-			EventMeta: simplevent.EventMeta{
-				Type:         bridgev2.RemoteEventChatResync,
-				PortalKey:    qc.makePortalKey(chatType, chatID),
-				CreatePortal: true,
-				LogContext: func(c zerolog.Context) zerolog.Context {
-					return c.Str("sync_reason", "recent_contacts")
+	} else {
+		for _, contact := range contacts {
+			chatID, chatType := contactToChat(contact)
+			if chatID == "" || chatType == qqid.ChatUnknown {
+				continue
+			}
+			latestTS := contactLatestTime(contact)
+			qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &simplevent.ChatResync{
+				EventMeta: simplevent.EventMeta{
+					Type:         bridgev2.RemoteEventChatResync,
+					PortalKey:    qc.makePortalKey(chatType, chatID),
+					CreatePortal: true,
+					LogContext: func(c zerolog.Context) zerolog.Context {
+						return c.Str("sync_reason", "recent_contacts")
+					},
 				},
-			},
-			GetChatInfoFunc: func(ctx context.Context, portal *bridgev2.Portal) (*bridgev2.ChatInfo, error) {
-				return qc.GetChatInfo(ctx, portal)
-			},
-			LatestMessageTS: latestTS,
-		})
+				GetChatInfoFunc: func(ctx context.Context, portal *bridgev2.Portal) (*bridgev2.ChatInfo, error) {
+					return qc.GetChatInfo(ctx, portal)
+				},
+				LatestMessageTS: latestTS,
+			})
+		}
+	}
+
+	// Sync all friends
+	friends, err := sess.GetFriendList(ctx)
+	if err != nil {
+		qc.UserLogin.Log.Warn().Err(err).Msg("Failed to fetch QQ friend list")
+	} else {
+		for _, f := range friends {
+			qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &simplevent.ChatResync{
+				EventMeta: simplevent.EventMeta{
+					Type:         bridgev2.RemoteEventChatResync,
+					PortalKey:    qc.makePortalKey(qqid.ChatPrivate, f.UserID.String()),
+					CreatePortal: true,
+					LogContext: func(c zerolog.Context) zerolog.Context {
+						return c.Str("sync_reason", "friend_list")
+					},
+				},
+				GetChatInfoFunc: func(ctx context.Context, portal *bridgev2.Portal) (*bridgev2.ChatInfo, error) {
+					return qc.GetChatInfo(ctx, portal)
+				},
+			})
+		}
+	}
+
+	// Sync all groups
+	groups, err := sess.GetGroupList(ctx)
+	if err != nil {
+		qc.UserLogin.Log.Warn().Err(err).Msg("Failed to fetch QQ group list")
+	} else {
+		for _, g := range groups {
+			qc.Main.Bridge.QueueRemoteEvent(qc.UserLogin, &simplevent.ChatResync{
+				EventMeta: simplevent.EventMeta{
+					Type:         bridgev2.RemoteEventChatResync,
+					PortalKey:    qc.makePortalKey(qqid.ChatGroup, g.GroupID.String()),
+					CreatePortal: true,
+					LogContext: func(c zerolog.Context) zerolog.Context {
+						return c.Str("sync_reason", "group_list")
+					},
+				},
+				GetChatInfoFunc: func(ctx context.Context, portal *bridgev2.Portal) (*bridgev2.ChatInfo, error) {
+					return qc.GetChatInfo(ctx, portal)
+				},
+			})
+		}
 	}
 }
 

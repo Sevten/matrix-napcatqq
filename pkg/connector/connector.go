@@ -8,6 +8,7 @@ import (
 	"github.com/sevten/matrix-napcatqq/pkg/onebot"
 
 	"maunium.net/go/mautrix/bridgev2"
+	"maunium.net/go/mautrix/bridgev2/commands"
 )
 
 var (
@@ -26,6 +27,8 @@ type QQConnector struct {
 func (qc *QQConnector) Init(bridge *bridgev2.Bridge) {
 	qc.Bridge = bridge
 	qc.MsgConv = msgconv.NewMessageConverter(bridge)
+
+	bridge.Commands.(*commands.Processor).AddHandlers(CommandAcceptFriend, CommandAcceptGroup)
 }
 
 func (qc *QQConnector) Start(ctx context.Context) error {

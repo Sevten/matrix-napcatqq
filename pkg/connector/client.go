@@ -31,6 +31,7 @@ type QQClient struct {
 var (
 	_ bridgev2.NetworkAPI                    = (*QQClient)(nil)
 	_ bridgev2.IdentifierResolvingNetworkAPI = (*QQClient)(nil)
+	_ bridgev2.MembershipHandlingNetworkAPI  = (*QQClient)(nil)
 )
 
 func (qc *QQClient) Connect(ctx context.Context) {
@@ -77,7 +78,7 @@ func (qc *QQClient) startLoops() {
 	}
 
 	go qc.ghostResyncLoop(ctx)
-	go qc.syncRecentContacts(ctx)
+	go qc.syncAllContacts(ctx)
 }
 
 func (qc *QQClient) session() *onebot.Session {
@@ -90,3 +91,4 @@ func (qc *QQClient) session() *onebot.Session {
 	}
 	return sess
 }
+

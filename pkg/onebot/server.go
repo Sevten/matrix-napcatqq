@@ -535,3 +535,29 @@ func (s *Session) SetGroupAddRequest(ctx context.Context, flag string, subType s
 		"reason":   reason,
 	}, nil)
 }
+
+func (s *Session) SetQQProfile(ctx context.Context, nickname string, personalNote string, sex string) error {
+	return s.Call(ctx, "set_qq_profile", map[string]any{
+		"nickname":      nickname,
+		"personal_note": personalNote,
+		"sex":           sex,
+	}, nil)
+}
+
+func (s *Session) SetQQAvatar(ctx context.Context, file string) error {
+	return s.Call(ctx, "set_qq_avatar", map[string]any{
+		"file": file,
+	}, nil)
+}
+
+func (s *Session) GetFriendList(ctx context.Context) ([]FriendInfo, error) {
+	var list []FriendInfo
+	err := s.Call(ctx, "get_friend_list", nil, &list)
+	return list, err
+}
+
+func (s *Session) GetGroupList(ctx context.Context) ([]GroupInfo, error) {
+	var list []GroupInfo
+	err := s.Call(ctx, "get_group_list", nil, &list)
+	return list, err
+}
