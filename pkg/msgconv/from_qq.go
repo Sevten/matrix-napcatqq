@@ -90,25 +90,38 @@ func (mc *MessageConverter) convertImageMessage(ctx context.Context, msg *qqid.M
 	}
 
 	if len(parts) == 1 {
+		// Extract non-media text segments (e.g. caption typed alongside the image)
 		var textContent strings.Builder
-		hasText := false
 		for _, elem := range msg.Elements {
-			if elem.Type != "image" && elem.Type != "mface" && elem.Type != "record" && elem.Type != "video" && elem.Type != "file" {
+			if elem.Type != "image" && elem.Type != "mface" && elem.Type != "record" && elem.Type != "video" && elem.Type != "file" && elem.Type != "reply" {
 				textContent.WriteString(toContent([]onebot.Segment{elem}))
-				hasText = true
 			}
 		}
 		text := strings.TrimSpace(textContent.String())
-		if hasText && text != "" {
-			textPart := mc.convertTextMessage(msg)
-			textPart.Content.Body = text
-			parts = append(parts, textPart)
+		if text != "" {
+			// Use the framework's MergeCaption to properly attach the caption
+			// to the image part (sets FileName = original body, Body = caption)
+			// which follows the Matrix spec for media captions.
+			textPart := &bridgev2.ConvertedMessagePart{
+				Type: event.EventMessage,
+				Content: &event.MessageEventContent{
+					MsgType: event.MsgText,
+					Body:    text,
+				},
+			}
+			merged := bridgev2.MergeCaption(textPart, parts[0])
+			if merged != nil {
+				return []*bridgev2.ConvertedMessagePart{merged}
+			}
 		}
 		return parts
 	}
 
+	// Multiple images: render as a text message with markdown image links,
+	// and assign unique PartIDs so they don't conflict in the DB.
 	var imagesMarkdown strings.Builder
-	for _, part := range parts {
+	for i, part := range parts {
+		part.ID = networkid.PartID(fmt.Sprintf("image-%d", i))
 		fmt.Fprintf(&imagesMarkdown, "![%s](%s)\n", part.Content.FileName, part.Content.URL)
 	}
 	rendered := format.RenderMarkdown(imagesMarkdown.String(), true, false)
