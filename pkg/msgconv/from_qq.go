@@ -17,7 +17,6 @@ import (
 	"maunium.net/go/mautrix/bridgev2"
 	"maunium.net/go/mautrix/bridgev2/networkid"
 	"maunium.net/go/mautrix/event"
-	"maunium.net/go/mautrix/format"
 	"maunium.net/go/mautrix/id"
 )
 
@@ -42,10 +41,8 @@ func (mc *MessageConverter) ToMatrix(
 
 	var parts []*bridgev2.ConvertedMessagePart
 	switch msg.Type {
-	case qqid.MsgImage:
-		parts = mc.convertImageMessage(ctx, msg)
-	case qqid.MsgAudio, qqid.MsgVideo, qqid.MsgFile:
-		parts = mc.convertMediaMessage(ctx, msg)
+	case qqid.MsgImage, qqid.MsgAudio, qqid.MsgVideo, qqid.MsgFile:
+		parts = mc.convertMediaMessageWithCaption(ctx, msg)
 	case qqid.MsgApp:
 		parts = mc.convertAppMessage(ctx, msg)
 	case qqid.MsgSticker:
@@ -83,58 +80,51 @@ func (mc *MessageConverter) convertTextMessage(msg *qqid.Message) *bridgev2.Conv
 	}
 }
 
-func (mc *MessageConverter) convertImageMessage(ctx context.Context, msg *qqid.Message) []*bridgev2.ConvertedMessagePart {
+func (mc *MessageConverter) convertMediaMessageWithCaption(ctx context.Context, msg *qqid.Message) []*bridgev2.ConvertedMessagePart {
 	parts := mc.convertMediaMessage(ctx, msg)
 	if len(parts) == 0 {
 		return []*bridgev2.ConvertedMessagePart{mc.convertTextMessage(msg)}
 	}
 
-	if len(parts) == 1 {
-		// Extract non-media text segments (e.g. caption typed alongside the image)
-		var textContent strings.Builder
-		for _, elem := range msg.Elements {
-			if elem.Type != "image" && elem.Type != "mface" && elem.Type != "record" && elem.Type != "video" && elem.Type != "file" && elem.Type != "reply" {
-				textContent.WriteString(toContent([]onebot.Segment{elem}))
-			}
+	// Extract non-media text segments (e.g. caption typed alongside the media)
+	var textContent strings.Builder
+	for _, elem := range msg.Elements {
+		if elem.Type != "image" && elem.Type != "mface" && elem.Type != "record" && elem.Type != "video" && elem.Type != "file" && elem.Type != "reply" {
+			textContent.WriteString(toContent([]onebot.Segment{elem}))
 		}
-		text := strings.TrimSpace(textContent.String())
-		if text != "" {
-			// Use the framework's MergeCaption to properly attach the caption
-			// to the image part (sets FileName = original body, Body = caption)
-			// which follows the Matrix spec for media captions.
-			textPart := &bridgev2.ConvertedMessagePart{
-				Type: event.EventMessage,
-				Content: &event.MessageEventContent{
-					MsgType: event.MsgText,
-					Body:    text,
-				},
-			}
-			merged := bridgev2.MergeCaption(textPart, parts[0])
-			if merged != nil {
+	}
+	text := strings.TrimSpace(textContent.String())
+
+	if text != "" {
+		textPart := &bridgev2.ConvertedMessagePart{
+			Type: event.EventMessage,
+			Content: &event.MessageEventContent{
+				MsgType: event.MsgText,
+				Body:    text,
+			},
+		}
+
+		if len(parts) == 1 {
+			if merged := bridgev2.MergeCaption(textPart, parts[0]); merged != nil {
 				return []*bridgev2.ConvertedMessagePart{merged}
 			}
 		}
-		return parts
+
+		// If len(parts) > 1 or MergeCaption didn't apply, append text as a separate part
+		textPart.ID = "caption"
+		parts = append(parts, textPart)
 	}
 
-	// Multiple images: render as a text message with markdown image links,
-	// and assign unique PartIDs so they don't conflict in the DB.
-	var imagesMarkdown strings.Builder
-	for i, part := range parts {
-		part.ID = networkid.PartID(fmt.Sprintf("image-%d", i))
-		fmt.Fprintf(&imagesMarkdown, "![%s](%s)\n", part.Content.FileName, part.Content.URL)
+	// Assign unique PartIDs to prevent conflicts in the DB if there are multiple parts
+	if len(parts) > 1 {
+		for i, part := range parts {
+			if part.ID == "" {
+				part.ID = networkid.PartID(fmt.Sprintf("media-%d", i))
+			}
+		}
 	}
-	rendered := format.RenderMarkdown(imagesMarkdown.String(), true, false)
-	content := toContent(msg.Elements)
-	return []*bridgev2.ConvertedMessagePart{{
-		Type: event.EventMessage,
-		Content: &event.MessageEventContent{
-			MsgType:       event.MsgText,
-			Format:        event.FormatHTML,
-			Body:          content,
-			FormattedBody: fmt.Sprintf("%s\n%s", rendered.FormattedBody, content),
-		},
-	}}
+
+	return parts
 }
 
 func (mc *MessageConverter) convertMediaMessage(ctx context.Context, msg *qqid.Message) []*bridgev2.ConvertedMessagePart {
