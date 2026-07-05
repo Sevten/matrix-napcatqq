@@ -323,6 +323,7 @@ func (mc *MessageConverter) reuploadAttachment(ctx context.Context, elem onebot.
 	if content.FileName == "" {
 		content.FileName = "attachment" + mime.Extension()
 	}
+	content.Body = content.FileName
 	content.URL, content.File, err = getIntent(ctx).UploadMedia(ctx, getPortal(ctx).MXID, data, content.FileName, mime.String())
 	if err != nil {
 		return nil, err
